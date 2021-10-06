@@ -1,3 +1,5 @@
+"pip install --upgrade dash dash-core-components dash-html-components dash-renderer dash_bootstrap_components"
+
 """
 A simple app demonstrating how to dynamically render tab content containing
 dcc.Graph components to ensure graphs get sized correctly. We also show how
@@ -9,6 +11,7 @@ import time
 import pandas as pd
 import dash_table as dt
 
+from flask import Flask
 import sqlite3
 import dash
 from dash import dash_table
@@ -19,16 +22,15 @@ import numpy as np
 import plotly.graph_objs as go
 from dash.dependencies import Input, Output
 
-app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+# Normally, Dash creates its own Flask server internally. By creating our own,
+# we can create a route for downloading files directly:
+server = Flask(__name__)
+app = dash.Dash(server=server, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-PLOTLY_LOGO = "https://images.plot.ly/logo/new-branding/plotly-logomark.png"
-
-# Load callbacks
-# https://community.plotly.com/t/splitting-callback-definitions-in-multiple-files/10583/2
-#import call_layout
-from call_annotations import *
 import call_blastree
 from call_variables import search_bar
+
+PLOTLY_LOGO = "https://images.plot.ly/logo/new-branding/plotly-logomark.png"
 
 navbar = dbc.Navbar(
 
@@ -44,7 +46,7 @@ navbar = dbc.Navbar(
                  dbc.Col(dbc.NavLink("Tools", href="/tools", className="ml-2")),
                  dbc.Col(dbc.NavLink("Downloads", href="/downloads", className="ml-2")),
                  dbc.Col(dbc.NavLink("Feedback", href="/feedback", className="ml-2")),
-                 ], 
+                 ],
                 align="center", no_gutters=True,
             ),
             href="https://www.plantapp.org",
@@ -62,34 +64,37 @@ navbar = dbc.Navbar(
 app.layout = dbc.Container(
     [
         dcc.Store(id="store"),
-        
+
         #html.H1("Dynamically rendered tab content"),
         html.Hr(),
-        
+
         navbar,
-        
+
         dbc.Tabs(
             [
-                dbc.Tab(label="Annotations", tab_id="scatter"),
-                dbc.Tab(label="Sequences", tab_id="histogram"),
+                dbc.Tab(label="Available DBs", tab_id="available_dbs"),
+                dbc.Tab(label="Annotations", tab_id="annotations"),
+                dbc.Tab(label="Sequences", tab_id="sequences"),
             ],
             id="tabs",
             active_tab="scatter",
         ),
-        html.Div(id="tab-content", className="p-4"),
         
-		html.Div([
-    		dcc.Textarea(
-        		id='gene-list',
-        		value='Textarea content initialized\nwith multiple lines of text',
-        		style={'width': '100%', 'height': 100},
-    			),
-    		]),
-    	
-		html.Div(id="annotation_table"),
-    #dbc.Row([table])
+        html.Div(id="tab_content"),
+
+        
+      #dbc.Row([table])
     ]
 )
 
+from call_layout import *
+#from call_annotations import *
+
+
+# Load callbacks
+# https://community.plotly.com/t/splitting-callback-definitions-in-multiple-files/10583/2
+#import call_layout
+
 if __name__ == "__main__":
     app.run_server(debug=True, port=8880)
+#    app.run_server()
