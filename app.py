@@ -75,6 +75,7 @@ app.layout = dbc.Container(
                 dbc.Tab(label="Available DBs", tab_id="available_dbs"),
                 dbc.Tab(label="Annotations", tab_id="annotations"),
                 dbc.Tab(label="Sequences", tab_id="sequences"),
+                dbc.Tab(label="Omics", tab_id="omics"),
             ],
             id="tabs",
             active_tab="scatter",
@@ -96,5 +97,5 @@ from call_layout import *
 #import call_layout
 
 if __name__ == "__main__":
-    app.run_server(debug=True, port=8880)
-#    app.run_server()
+#    app.run_server(debug=True, port=8880)
+    app.run_server()
