@@ -10,14 +10,14 @@ import dash_table as dt
 from flask import Flask
 import sqlite3
 import dash
-from dash import dash_table
 import dash_bootstrap_components as dbc
-from dash import dcc
-from dash import html
+from dash import Dash, dcc, html, Input, Output, State, dash_table
+
 import numpy as np
 import plotly.graph_objs as go
 from dash.dependencies import Input, Output
 
+import zlib
 
 @app.callback(
     Output("tab_content", "children"), 
@@ -27,8 +27,8 @@ def switch_tab(at):
         return show_available_species() 
     elif at == "annotations":
         return tab_annotation_content
-    elif at == "sequences":
-        return html.P("Seqs tab...")
+    elif at == "proteins":
+        return tab_protein_content
     elif at == "omics":
         return tab_omics_content
     return html.P("This shouldn't ever be displayed...")
@@ -127,9 +127,9 @@ def show_available_species():
             columns=[{"name": i, "id": i} for i in output_df.columns],
             data=output_df.to_dict('records'))
 
-#html.Div([
-#    html.Div(id="available_dbs_table"),
-#    ])
+###############################################################################
+#                                Annotations
+###############################################################################
 
 tab_annotation_content = html.Div([
     dcc.Textarea(
@@ -140,10 +140,6 @@ tab_annotation_content = html.Div([
 
     html.Div(id="annotation_table"),
     ])
-
-###############################################################################
-#                                Annotations
-###############################################################################
 
 def annotation_select(con, entity_list):
     od = OrderedDict()
@@ -162,8 +158,8 @@ def annotation_select(con, entity_list):
     Output('annotation_table', 'children'),
     Input('gene-list', 'value'))
 def get_gene_list(value):
-    con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
-    #con = sqlite3.connect('SQNce.db')
+    #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+    con = sqlite3.connect('SQNce.db')
     try:
         gene_list = value.split("\n")
         if len(gene_list) > 50:
@@ -177,6 +173,82 @@ def get_gene_list(value):
         output_df.columns = ["GeneID", "annotation"]
         return dt.DataTable(
             columns=[{"name": i, "id": i} for i in output_df.columns],
-            data=output_df.to_dict('records'))
+            data=output_df.to_dict('records'),
+            style_cell={'textAlign': 'left',
+                        'overflow': 'hidden',
+                        'textOverflow': 'ellipsis',
+                        'maxWidth': 0,},
+            editable=True,
+            row_deletable=True,)
     except:
         return(html.P("Something did not work returning the table"))
+    
+###############################################################################
+#                                Protein Sequences
+###############################################################################
+
+tab_protein_content = html.Div([
+    dcc.Textarea(
+        id='protein-gene-list',
+        value='Textarea content initialized\nwith multiple lines of text',
+        style={'width': '100%', 'height': 100},
+        ),
+    dbc.Row(
+        [
+         dbc.Button("Download fasta with gene IDs", color="primary", className="mr-1"),
+         dbc.Button("Download fasta with symbols", color="primary", className="mr-1"),
+    ]),
+    dcc.Clipboard(id="protein_table_copy", style={"fontSize":20}),
+    html.Div(id="protein_seq_table"),
+    ])
+
+def proteins_select(con, entity_list):
+    od = OrderedDict()
+    for entity in entity_list:
+        cursorObj = con.cursor()
+        cursorObj.execute('''SELECT protein_id, protein_sequence
+                             FROM protein_seqs
+                             WHERE protein_id =  ?  ''', (entity,))
+        # (name,) - need the comma to treat it as a single item and not list of letters
+        selected = cursorObj.fetchall()[0]
+        od[selected[0]] = zlib.decompress(selected[1]).decode('utf-8')[:-1]
+    return(od)
+
+@app.callback(
+    Output('protein_seq_table', 'children'),
+    Input('protein-gene-list', 'value'))
+def get_protein_list(value):
+    #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+    con = sqlite3.connect('SQNce.db')
+    try:
+        gene_list = value.split("\n")
+        if len(gene_list) > 50:
+            gene_list = gene_list[:50]
+        if gene_list[-1]=="":
+            gene_list = gene_list[:-1]
+    except:
+        return(html.P("Something did not work reading the gene list"))
+    try:
+        output_df = pd.DataFrame.from_dict(proteins_select(con, gene_list), orient="index").reset_index()
+        output_df.columns = ["GeneID", "Sequence"]
+        return dt.DataTable(
+            id="protein_table_state",
+            columns=[{"name": i, "id": i} for i in output_df.columns],
+            data=output_df.to_dict('records'),
+            style_cell={'textAlign': 'left',
+                        'overflow': 'hidden',
+                        'maxWidth': 0,},
+            editable=True,
+            row_deletable=True,)
+    except:
+        return(html.P("Something did not work returning the table"))
+    
+@app.callback(
+    Output("protein_table_copy", "content"),
+    Input("protein_table_copy", "n_clicks"),
+    State("protein_table_state", "data"),
+)
+def custom_copy(_, data):
+    dff = pd.DataFrame(data)
+    # See options for .to_csv() or .to_excel() or .to_string() in the  pandas documentation
+    return dff.to_csv(index=False)  # includes headers

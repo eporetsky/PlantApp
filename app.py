@@ -66,7 +66,7 @@ app.layout = dbc.Container(
         dcc.Store(id="store"),
 
         #html.H1("Dynamically rendered tab content"),
-        html.Hr(),
+        #html.Hr(),
 
         navbar,
 
@@ -74,7 +74,7 @@ app.layout = dbc.Container(
             [
                 dbc.Tab(label="Available DBs", tab_id="available_dbs"),
                 dbc.Tab(label="Annotations", tab_id="annotations"),
-                dbc.Tab(label="Sequences", tab_id="sequences"),
+                dbc.Tab(label="Sequences", tab_id="proteins"),
                 dbc.Tab(label="Omics", tab_id="omics"),
             ],
             id="tabs",
@@ -85,7 +85,8 @@ app.layout = dbc.Container(
 
         
       #dbc.Row([table])
-    ]
+    ],
+    fluid=True
 )
 
 from call_layout import *
