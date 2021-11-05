@@ -6,15 +6,18 @@ dcc.Graph components to ensure graphs get sized correctly. We also show how
 dcc.Store can be used to cache the results of an expensive graph generation
 process so that switching tabs is fast.
 """
+#con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+# con = sqlite3.connect('SQNce.db')
+
 import time
 
 import pandas as pd
-import dash_table as dt
+from dash import dash_table as dt
+from dash import dash_table
 
 from flask import Flask
 import sqlite3
 import dash
-from dash import dash_table
 import dash_bootstrap_components as dbc
 from dash import dcc
 from dash import html
@@ -24,10 +27,19 @@ from dash.dependencies import Input, Output
 
 # Normally, Dash creates its own Flask server internally. By creating our own,
 # we can create a route for downloading files directly:
+
+
+
 server = Flask(__name__)
 app = dash.Dash(server=server, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-import call_blastree
+# Load callbacks
+# https://community.plotly.com/t/splitting-callback-definitions-in-multiple-files/10583/2
+#import call_layout
+from call_layout import *
+
+
+#import call_blastree
 from call_variables import search_bar
 
 PLOTLY_LOGO = "https://images.plot.ly/logo/new-branding/plotly-logomark.png"
@@ -47,7 +59,7 @@ navbar = dbc.Navbar(
                  dbc.Col(dbc.NavLink("Downloads", href="/downloads", className="ml-2")),
                  dbc.Col(dbc.NavLink("Feedback", href="/feedback", className="ml-2")),
                  ],
-                align="center", no_gutters=True,
+                align="center",# no_gutters=True,
             ),
             href="https://www.plantapp.org",
         ),
@@ -75,6 +87,7 @@ app.layout = dbc.Container(
                 dbc.Tab(label="Available DBs", tab_id="available_dbs"),
                 dbc.Tab(label="Annotations", tab_id="annotations"),
                 dbc.Tab(label="Sequences", tab_id="proteins"),
+                dbc.Tab(label="Promoters", tab_id="promoters"),
                 dbc.Tab(label="Omics", tab_id="omics"),
             ],
             id="tabs",
@@ -89,14 +102,8 @@ app.layout = dbc.Container(
     fluid=True
 )
 
-from call_layout import *
 #from call_annotations import *
 
-
-# Load callbacks
-# https://community.plotly.com/t/splitting-callback-definitions-in-multiple-files/10583/2
-#import call_layout
-
 if __name__ == "__main__":
-#    app.run_server(debug=True, port=8880)
+#    app.run_server(debug=True, host='127.0.0.1', port=8881)
     app.run_server()
