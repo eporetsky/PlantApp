@@ -23,6 +23,9 @@ from dash.dependencies import Input, Output
 import os
 import zlib
 
+#con = sqlite3.connect(os.getcwd()+'/SQNce.db')
+con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+
 @app.callback(
     Output("tab_content", "children"), 
     [Input("tabs", "active_tab")])
@@ -46,7 +49,8 @@ def switch_tab(at):
 def get_studies_species():
     # Returns a list of species names of all analyzed studies from SQNce.db
     #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
-    con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+    #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+    global con
     cursorObj = con.cursor()
     distinct_species_df = pd.read_sql("""
                 SELECT DISTINCT studies.scientific_name
@@ -59,7 +63,8 @@ def get_studies_species():
 
 def get_studies_in_species(selected_species):
     #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
-    con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+    #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+    global con
     cursorObj = con.cursor()
     sql_query = """SELECT studies.study_accession
                 FROM studies
@@ -87,7 +92,8 @@ def studies_in_species(value):
         
 def get_fastq_table(selected_species, selected_studies):
     #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
-    con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+    #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+    global con
     cursorObj = con.cursor()
     if selected_studies=="all":
         query_line = "studies.scientific_name='{0}'".format(selected_species)
@@ -129,7 +135,8 @@ tab_omics_content = html.Div([
 
 def show_available_species():
     #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
-    con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+    #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+    global con
     cursorObj = con.cursor()
     
     output_df = pd.read_sql_query("SELECT * FROM species", con)
@@ -231,8 +238,9 @@ def proteins_select(con, entity_list):
     Output('protein_seq_table', 'children'),
     Input('protein-gene-list', 'value'))
 def get_protein_list(value):
-    con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+    #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
     #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
+    global con
     try:
         gene_list = value.split("\n")
         if len(gene_list) > 50:
@@ -287,6 +295,11 @@ def func(n_clicks, data):
 ###############################################################################
 
 tab_promoter_content = html.Div([
+    dcc.Dropdown(
+        id='promoters-kind-dropdown',
+        options=[{'label': "TSS", 'value': "TSS"}, {'label': "ATG", 'value': "ATG"}],
+        value="TSS"
+        ),
     dcc.Textarea(
         id='promoter-gene-list',
         value='Insert list of genes to\nget a list of promoter sequences',
@@ -302,13 +315,13 @@ tab_promoter_content = html.Div([
     html.Div(id="promoter_seq_table"),
     ])
 
-def promoter_select(con, entity_list):
+def promoter_select(con, entity_list, promoter_kind):
     od = OrderedDict()
     for entity in entity_list:
         cursorObj = con.cursor()
         cursorObj.execute('''SELECT protein_id, promoter_sequence
                              FROM promoter_seqs
-                             WHERE protein_id =  ?  ''', (entity,))
+                             WHERE protein_id =  ? and promoter_kind = ?''', [entity, promoter_kind])
         # (name,) - need the comma to treat it as a single item and not list of letters
         selected = cursorObj.fetchall()[0]
         od[selected[0]] = zlib.decompress(selected[1]).decode('utf-8')[:-1]
@@ -317,20 +330,22 @@ def promoter_select(con, entity_list):
 
 @app.callback(
     Output('promoter_seq_table', 'children'),
-    Input('promoter-gene-list', 'value'))
-def get_promoter_list(value):
-    con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+    Input('promoter-gene-list', 'value'),
+    Input('promoters-kind-dropdown', 'value'))
+def get_promoter_list(gene_list, promoter_kind):
+    #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
     #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
+    global con
     try:
-        gene_list = value.split("\n")
-        if len(gene_list) > 1000:
-            gene_list = gene_list[:1000]
+        gene_list = gene_list.split("\n")
+        if len(gene_list) > 10000:
+            gene_list = gene_list[:10000]
         if gene_list[-1]=="":
             gene_list = gene_list[:-1]
     except:
-        return(html.P("Something did not work reading the gene list"))
+        return(html.P("Something did not work reading the gene list +"+str(gene_list)+promoter_kind))
     try:
-        output_df = pd.DataFrame.from_dict(promoter_select(con, gene_list), orient="index").reset_index()
+        output_df = pd.DataFrame.from_dict(promoter_select(con, gene_list, promoter_kind), orient="index").reset_index()
         output_df.columns = ["GeneID", "Sequence"]
         return dt.DataTable(
             id="promoter_table_state",
