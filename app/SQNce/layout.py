@@ -1,46 +1,41 @@
-"pip install --upgrade dash dash-core-components dash-html-components dash-renderer dash_bootstrap_components"
-
-"""
-A simple app demonstrating how to dynamically render tab content containing
-dcc.Graph components to ensure graphs get sized correctly. We also show how
-dcc.Store can be used to cache the results of an expensive graph generation
-process so that switching tabs is fast.
-"""
-#con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
-# con = sqlite3.connect('SQNce.db')
-
-import time
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.dependencies import Input, Output
 
 import pandas as pd
+from collections import OrderedDict
+import pandas as pd
+import sqlite3
 from dash import dash_table as dt
 from dash import dash_table
+
+import csv
 
 from flask import Flask
 import sqlite3
 import dash
 import dash_bootstrap_components as dbc
-from dash import dcc
-from dash import html
+from dash import Dash, dcc, html, Input, Output, State, dash_table
+
 import numpy as np
 import plotly.graph_objs as go
 from dash.dependencies import Input, Output
 
-# Normally, Dash creates its own Flask server internally. By creating our own,
-# we can create a route for downloading files directly:
+import os
+import zlib
 
-
-
-server = Flask(__name__)
-app = dash.Dash(server=server, external_stylesheets=[dbc.themes.BOOTSTRAP])
-
-# Load callbacks
-# https://community.plotly.com/t/splitting-callback-definitions-in-multiple-files/10583/2
-#import call_layout
-from call_layout import *
-
-
-#import call_blastree
-from call_variables import search_bar
+search_bar = [ 
+    dbc.Row([
+    dbc.Col(dbc.Input(type="search", placeholder="Search")),
+        dbc.Col(
+            dbc.Button("Search", color="primary", className="ml-2", n_clicks=0),
+            width="auto",),
+        ],
+    no_gutters=True,
+    className="ml-auto flex-nowrap mt-3 mt-md-0",
+    align="center",
+    ), 
+]
 
 PLOTLY_LOGO = "https://images.plot.ly/logo/new-branding/plotly-logomark.png"
 
@@ -72,8 +67,7 @@ navbar = dbc.Navbar(
 
 #table = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
 
-
-app.layout = dbc.Container(
+layout = dbc.Container(
     [
         dcc.Store(id="store"),
 
@@ -101,9 +95,3 @@ app.layout = dbc.Container(
     ],
     fluid=True
 )
-
-#from call_annotations import *
-
-if __name__ == "__main__":
-#    app.run_server(debug=True, host='127.0.0.1', port=8881)
-    app.run_server()

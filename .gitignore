@@ -2,3 +2,5 @@
 __pycache__/
 
 SQNce.db
+
+dash_on_flask/
