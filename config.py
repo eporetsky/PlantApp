@@ -1,4 +1,6 @@
 import os
+import dash_bootstrap_components as dbc
+
 basedir = os.path.abspath(os.path.dirname(__file__))
 print("Base dir is:", basedir)
 
