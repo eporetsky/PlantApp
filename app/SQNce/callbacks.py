@@ -43,9 +43,134 @@ def register_callbacks(dashapp):
             return tab_protein_content
         elif at == "promoters":
             return tab_promoter_content
+        elif at == "coordinates":
+            return tab_coordinates_content
         elif at == "omics":
             return tab_omics_content
         return html.P("This shouldn't ever be displayed...")
+
+    ###############################################################################
+    #                                Coordinates
+    ###############################################################################
+
+    def get_coordinate_genotypes():
+        # Returns a list of species names of all analyzed studies from SQNce.db
+        #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
+        #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+        con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
+        cursorObj = con.cursor()
+        distinct_genotypes_df = pd.read_sql_query('''SELECT DISTINCT gene_coordinates.genotype_id 
+                                                FROM gene_coordinates''', con)
+        dropdown_genotype_list = [{'label': "None", 'value': "None"}]
+        for name in distinct_genotypes_df["genotype_id"]:
+            dropdown_genotype_list.append({'label': name, 'value': name})
+        return(dropdown_genotype_list)
+
+    tab_coordinates_content = html.Div([
+        # Get a list of unique genotypes from the db
+        dcc.Dropdown(
+            id='coordinates_genotypes_dropdown',
+            options=get_coordinate_genotypes(),
+            value="None"
+        ),
+        
+        # Select how many bp from each side to search
+        dcc.Dropdown(
+            id='coordinates_range_dropdown',
+            options=[
+                {'label': '1,000bp', 'value': 1000},
+                {'label': '10,100bp', 'value': 10000},
+                {'label': '100,100bp', 'value': 100000}
+            ],
+            value=1000
+        ),
+
+        dcc.Dropdown(
+            id='coordinates_dedupe_dropdown',
+            options=[
+                {'label': "Remove duplicates", 'value': True},
+                {'label': "Keep all values", 'value': False}
+            ],
+            value="None"
+        ),
+
+        dcc.Textarea(
+            id='coordinates_list',
+            value='Textarea content initialized\nwith multiple lines of text',
+            style={'width': '100%', 'height': 100},
+            ),
+
+        html.Div(id="coordinates_table"),
+    ]),
+
+    # Query to find neighboring genes
+    def get_SNP_neighbors(genotype, chromsome, coordinate, distance):
+        con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
+        cursorObj = con.cursor()
+        df = pd.read_sql_query('''SELECT * 
+                        FROM gene_coordinates 
+                        WHERE genotype_id = "{0}"
+                        AND gene_chr = "{1}"
+                        AND gene_start BETWEEN {2} AND {3}
+                        
+                        UNION ALL
+                        
+                        SELECT * 
+                        FROM gene_coordinates 
+                        WHERE genotype_id = "{0}"
+                        AND gene_chr = "{1}"
+                        AND gene_start BETWEEN {2} AND {3}
+                        '''.format(genotype, chromsome, coordinate-distance, coordinate+distance), con)
+        # Should check why it returns the same row twice, probably need to correct the query
+        df = df.drop_duplicates()
+        df.insert(0, 'Query', pd.Series(["_".join([chromsome, str(coordinate)]) for x in range(len(df.index))]))
+        print("before return")
+        print(df)
+        return(df)
+
+    @dashapp.callback(
+        Output('coordinates_table', 'children'),
+        Input('coordinates_list', 'value'),
+        Input("coordinates_genotypes_dropdown", 'value'),        
+        Input("coordinates_range_dropdown", 'value'),
+        Input("coordinates_dedupe_dropdown", 'value'),
+    )
+    def get_coordinates_gene_list(value, genotype, distance, dedupe):
+        # Dedupe - remove duplicates that might appear of entries are close-by
+        con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
+        cursorObj = con.cursor()
+        #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
+        #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
+        try:
+            rows = value.split("\n")
+            coordinate_list = [row.split("\t") for row in rows]
+            if coordinate_list[-1]==[""]:
+                coordinate_list = coordinate_list[:-1]
+            for row in coordinate_list:
+                if len(row) != 2:
+                    return(html.P("Number of columns is not 2. Use tab-seperated values."))
+        except:
+            return(html.P("Something did not work while reading the coordinate list"))
+        try:
+            df = pd.DataFrame()
+            print(coordinate_list)
+            print("1,", genotype, row, distance)
+            for row in coordinate_list:
+                df = pd.concat([df, get_SNP_neighbors(genotype, str(row[0]), int(row[1]), distance)])
+            if dedupe:
+                df = df.drop_duplicates(subset=["gene_id"]).reset_index()
+            print("2", df)
+            return dash_table.DataTable(
+                columns=[{"name": i, "id": i} for i in df.columns],
+                data=df.to_dict('records'),
+                style_cell={'textAlign': 'left',
+                            'overflow': 'hidden',
+                            'textOverflow': 'ellipsis',
+                            'maxWidth': 0,},
+                editable=True,
+                row_deletable=True,)
+        except:
+            return(html.P("Something did not work returning the table"))
 
     ###############################################################################
     #                            Analyzed Studies
@@ -171,8 +296,13 @@ def register_callbacks(dashapp):
                                 FROM gene_annotations
                                 WHERE gene_id =  ?  ''', (entity,))
             # (name,) - need the comma to treat it as a single item and not list of letters
-            selected = cursorObj.fetchall()[0]
-            od[selected[0]] = selected[1]
+            fetched = cursorObj.fetchall()
+            print(fetched)
+            if fetched == []:
+                od[entity] = "Gene not found"
+            else:
+                selected = fetched[0]
+                od[selected[0]] = selected[1]            
         return(od)
 
 
@@ -185,8 +315,8 @@ def register_callbacks(dashapp):
         #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
         try:
             gene_list = value.split("\n")
-            if len(gene_list) > 50:
-                gene_list = gene_list[:50]
+            if len(gene_list) > 500:
+                gene_list = gene_list[:500]
             if gene_list[-1]=="":
                 gene_list = gene_list[:-1]
         except:
@@ -205,7 +335,7 @@ def register_callbacks(dashapp):
                 row_deletable=True,)
         except:
             return(html.P("Something did not work returning the table"))
-        
+
     ###############################################################################
     #                                Protein Sequences
     ###############################################################################
@@ -249,8 +379,8 @@ def register_callbacks(dashapp):
         con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
         try:
             gene_list = value.split("\n")
-            if len(gene_list) > 50:
-                gene_list = gene_list[:50]
+            if len(gene_list) > 500:
+                gene_list = gene_list[:500]
             if gene_list[-1]=="":
                 gene_list = gene_list[:-1]
         except:

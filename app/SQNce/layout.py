@@ -38,6 +38,7 @@ layout = dbc.Container(
         [
             dbc.Tab(label="Available DBs", tab_id="available_dbs"),
             dbc.Tab(label="Annotations", tab_id="annotations"),
+            dbc.Tab(label="Coordinates", tab_id="coordinates"),
             dbc.Tab(label="Sequences", tab_id="proteins"),
             dbc.Tab(label="Promoters", tab_id="promoters"),
             dbc.Tab(label="Omics", tab_id="omics"),
