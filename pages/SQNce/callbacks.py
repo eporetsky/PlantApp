@@ -24,13 +24,6 @@ def register_callbacks(dashapp):
     import os
     import zlib
 
-    #print("###################### SQLITE3 ######################")
-    #print(os.getcwd()+'\SQNce.db')
-    
-    #con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
-    #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
-    #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
-
     @dashapp.callback(
         Output("tab_content", "children"), 
         [Input("tabs", "active_tab")])
@@ -55,8 +48,6 @@ def register_callbacks(dashapp):
 
     def get_coordinate_genotypes():
         # Returns a list of species names of all analyzed studies from SQNce.db
-        #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
-        #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
         con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
         cursorObj = con.cursor()
         distinct_genotypes_df = pd.read_sql_query('''SELECT DISTINCT gene_coordinates.genotype_id 
@@ -79,8 +70,8 @@ def register_callbacks(dashapp):
             id='coordinates_range_dropdown',
             options=[
                 {'label': '1,000bp', 'value': 1000},
-                {'label': '10,100bp', 'value': 10000},
-                {'label': '100,100bp', 'value': 100000}
+                {'label': '10,000bp', 'value': 10000},
+                {'label': '100,000bp', 'value': 100000}
             ],
             value=1000
         ),
@@ -119,13 +110,11 @@ def register_callbacks(dashapp):
                         FROM gene_coordinates 
                         WHERE genotype_id = "{0}"
                         AND gene_chr = "{1}"
-                        AND gene_start BETWEEN {2} AND {3}
+                        AND gene_end BETWEEN {2} AND {3}
                         '''.format(genotype, chromsome, coordinate-distance, coordinate+distance), con)
         # Should check why it returns the same row twice, probably need to correct the query
         df = df.drop_duplicates()
         df.insert(0, 'Query', pd.Series(["_".join([chromsome, str(coordinate)]) for x in range(len(df.index))]))
-        print("before return")
-        print(df)
         return(df)
 
     @dashapp.callback(
@@ -139,8 +128,6 @@ def register_callbacks(dashapp):
         # Dedupe - remove duplicates that might appear of entries are close-by
         con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
         cursorObj = con.cursor()
-        #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
-        #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
         try:
             rows = value.split("\n")
             coordinate_list = [row.split("\t") for row in rows]
@@ -153,13 +140,17 @@ def register_callbacks(dashapp):
             return(html.P("Something did not work while reading the coordinate list"))
         try:
             df = pd.DataFrame()
-            print(coordinate_list)
-            print("1,", genotype, row, distance)
+            # Check the neighboring genes for each row in the input data
             for row in coordinate_list:
                 df = pd.concat([df, get_SNP_neighbors(genotype, str(row[0]), int(row[1]), distance)])
+            # Since some genes can overlap, remove duplicated values and eep first
             if dedupe:
                 df = df.drop_duplicates(subset=["gene_id"]).reset_index()
-            print("2", df)
+
+            # Add a column of gene annotations when available
+            df["annotation"] = annotation_select(con, df["gene_id"].to_list())
+
+            # Export the dast datatable to the content container
             return dash_table.DataTable(
                 columns=[{"name": i, "id": i} for i in df.columns],
                 data=df.to_dict('records'),
@@ -178,8 +169,6 @@ def register_callbacks(dashapp):
 
     def get_studies_species():
         # Returns a list of species names of all analyzed studies from SQNce.db
-        #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
-        #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
         con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
         cursorObj = con.cursor()
         distinct_species_df = pd.read_sql("""
@@ -192,8 +181,6 @@ def register_callbacks(dashapp):
         return(dropdown_species_list)
 
     def get_studies_in_species(selected_species):
-        #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
-        #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
         con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
         cursorObj = con.cursor()
         sql_query = """SELECT studies.study_accession
@@ -221,8 +208,6 @@ def register_callbacks(dashapp):
             )
             
     def get_fastq_table(selected_species, selected_studies):
-        #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
-        #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
         con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
         cursorObj = con.cursor()
         if selected_studies=="all":
@@ -264,8 +249,6 @@ def register_callbacks(dashapp):
     ###############################################################################
 
     def show_available_species():
-        #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
-        #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
         con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
         cursorObj = con.cursor()
         
@@ -289,30 +272,25 @@ def register_callbacks(dashapp):
         ])
 
     def annotation_select(con, entity_list):
-        od = OrderedDict()
+        ls = []
         for entity in entity_list:
             cursorObj = con.cursor()
-            cursorObj.execute('''SELECT gene_id, gene_annotation
-                                FROM gene_annotations
+            cursorObj.execute('''SELECT gene_id, gene_annotation 
+                                FROM gene_annotations 
                                 WHERE gene_id =  ?  ''', (entity,))
             # (name,) - need the comma to treat it as a single item and not list of letters
-            fetched = cursorObj.fetchall()
-            print(fetched)
-            if fetched == []:
-                od[entity] = "Gene not found"
+            selected = cursorObj.fetchall()
+            if selected == []:
+                ls.append("Gene not found")
             else:
-                selected = fetched[0]
-                od[selected[0]] = selected[1]            
-        return(od)
-
+                ls.append(selected[0][1])    
+        return(ls)
 
     @dashapp.callback(
         Output('annotation_table', 'children'),
         Input('gene-list', 'value'))
     def get_gene_list(value):
         con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
-        #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
-        #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
         try:
             gene_list = value.split("\n")
             if len(gene_list) > 500:
@@ -322,7 +300,7 @@ def register_callbacks(dashapp):
         except:
             return(html.P("Something did not work reading the gene list"))
         try:
-            output_df = pd.DataFrame.from_dict(annotation_select(con, gene_list), orient="index").reset_index()
+            output_df = pd.DataFrame({"GeneID": gene_list, "annotation": annotation_select(con, gene_list) })
             output_df.columns = ["GeneID", "annotation"]
             return dash_table.DataTable(
                 columns=[{"name": i, "id": i} for i in output_df.columns],
@@ -374,8 +352,6 @@ def register_callbacks(dashapp):
         Output('protein_seq_table', 'children'),
         Input('protein-gene-list', 'value'))
     def get_protein_list(value):
-        #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
-        #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
         con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
         try:
             gene_list = value.split("\n")
@@ -469,8 +445,6 @@ def register_callbacks(dashapp):
         Input('promoter-gene-list', 'value'),
         Input('promoters-kind-dropdown', 'value'))
     def get_promoter_list(gene_list, promoter_kind):
-        #con = sqlite3.connect('/home/eporetsky/plantapp/SQNce.db')
-        #con = sqlite3.connect(os.getcwd()+'/SQNce.db')
         con = sqlite3.connect(os.getcwd()+'\SQNce.db') # for windows
         try:
             gene_list = gene_list.split("\n")
