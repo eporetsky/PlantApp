@@ -1,0 +1,4 @@
+genotype_id	source	fasta	gff3	size	output
+Arabidopsis	Phytozome	Athaliana_167_TAIR10.fa.gz	Athaliana_167_TAIR10.gene.gff3.gz	1000	Athaliana_167
+Maize	Phytozome	Zmays_493_APGv4.fa.gz	Zmays_493_RefGen_V4.gene.gff3.gz	1000	Zmays_493_APGv4
+Sorghum	Phytozome	Sbicolor_454_v3.0.1.fa.gz	Sbicolor_454_v3.1.1.gene.gff3.gz	1000	Sbicolor_454_v3.0.1

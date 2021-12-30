@@ -1,0 +1,4 @@
+species_id	genotype_id	fasta_name
+Arabidopsis thaliana	Col-0	Athaliana_167_TAIR10.protein_primaryTranscriptOnly.fa.gz
+Glycine max	Wm82	Gmax_508_Wm82.a4.v1.protein_primaryTranscriptOnly.fa.gz
+Zea mays	B73	Zmays_493_RefGen_V4.protein_primaryTranscriptOnly.fa.gz

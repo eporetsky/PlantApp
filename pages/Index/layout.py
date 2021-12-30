@@ -54,6 +54,13 @@ layout = dbc.Container(
                     Both PlantApp and SQNce are currently under development and are constantly being updated. At this developmental
                     phase I am primarily relying on the [Phytozome](https://phytozome-next.jgi.doe.gov/) annotation files. 
                     For requests or issue report e-mail me at eporetsky at ucsd.edu or message me on Twitter @externelly.
+
+                    I am currently focusing on including all the sequenced maize genomes available on MaizeGDB and some representatives 
+                    plant species from JGI Phytozome. For these and future included genomes the annotation effort for each gene will
+                    focus on a single representative primary transcript. Phytozome genome files include curated primary transcript
+                    files that I inted to use. In the absence of primary transcript annotations I will use the longest transcripts
+                    to begin with but will work on selecting a transcript that best matches Phytozome primary transcript in a closely
+                    related genome.
                     ''')
                 ), 
             width=6),

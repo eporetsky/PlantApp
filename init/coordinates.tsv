@@ -1,0 +1,6 @@
+species	genotype_id	source	gff3
+Arabidopsis thaliana	Arabidopsis	Phytozome	Athaliana_167_TAIR10.gene.gff3.gz
+Zea mays	B73v4	Phytozome	Zmays_493_RefGen_V4.gene.gff3.gz
+Sorghum bicolor	Sorghum	Phytozome	Sbicolor_454_v3.1.1.gene.gff3.gz
+Zea mays	B73v2	MaizeGDB	ZmB73_5b.60_FGS.gff3.gz
+Glycine max	Gmax	Phytozome	Gmax_508_Wm82.a4.v1.gene.gff3.gz

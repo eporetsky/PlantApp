@@ -33,24 +33,21 @@ layout = dbc.Container(
         ],
     color="dark", dark=True,
     ),
-    
-    dbc.Tabs(
-        [
-            dbc.Tab(label="Available DBs", tab_id="available_dbs"),
-            dbc.Tab(label="Annotations", tab_id="annotations"),
-            dbc.Tab(label="Coordinates", tab_id="coordinates"),
-            dbc.Tab(label="Sequences", tab_id="proteins"),
-            dbc.Tab(label="Promoters", tab_id="promoters"),
-            dbc.Tab(label="Omics", tab_id="omics"),
-        ],
-        id="tabs",
-        active_tab="scatter",
-    ),
-        
+
+    html.A(dbc.Row([
+            dbc.Button("Available DBs", id="available_dbs", className="me-1"),
+            dbc.Button("Annotations", id="annotations", className="me-1"),
+            dbc.DropdownMenu([dbc.DropdownMenuItem("Using Family Names", id="families_familyIDs"),
+                              dbc.DropdownMenuItem("Using Gene IDs", id="families_geneIDs")], label="Families"),
+            dbc.Button("Coordinates", id="coordinates", className="me-1"),
+            dbc.Button("Sequences", id="proteins", className="me-1"),
+            dbc.Button("Promoters", id="promoters", className="me-1"),
+            dbc.Button("Omics", id="omics", className="me-1"),
+    ])),
+
+ 
     html.Div(id="tab_content"),
 
-        
-      #dbc.Row([table])
     ],
     fluid=True  
 )
