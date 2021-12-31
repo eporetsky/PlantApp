@@ -42,8 +42,6 @@ def register_callbacks(dashapp):
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
 
-    session_id = str(uuid.uuid1())
-
     # Set the cwd and SQNce.db path to be platform independent  
     if "plantapp" not in os.getcwd().lower():
         cwd = "/home/eporetsky/plantapp" # for server hosting
@@ -69,20 +67,12 @@ def register_callbacks(dashapp):
                 value='Paste gene list',
                 style={'width': '100%', 'height': 100},
                 ),
-        dbc.Button('Get gene list', color="primary", id="simple_tree_fasta_button", className="mr-1",  n_clicks=0),
-
-        html.H2("Download Fasta File"),
-        html.Div(id="simple_tree_fasta_download"),
-
         html.Button('Prepare alignment and tree', id='simple_tree_aln_button', type='submit'),
-        html.H2("Download Alignment and Tree"),
-        html.Ul(id="simple_tree_aln_download"),
-        html.Ul(id="simple_tree_tree_download"),
-        html.Ul(id="simple_tree_tree_png_download"),
-        html.Div([html.Img(id = 'simple_tree_tree_figure', src = '')], id='plot_div'),
+        html.Div(id='simple_tree_tree_figure'),
+        #html.Div([html.Img(id = 'simple_tree_tree_figure', src = '')], id='plot_div'),
         ])
 
-    def simple_tree_write_fasta(con, entity_list):
+    def simple_tree_write_fasta(con, entity_list, session_id):
         od = OrderedDict()
         for entity in entity_list:
             cursorObj = con.cursor()
@@ -96,20 +86,22 @@ def register_callbacks(dashapp):
             selected = selected[0] # Otherwise, get the value of the first returned row
             record = SeqRecord(Seq(zlib.decompress(selected[1]).decode(encoding='UTF-8')[:-1]), id=selected[0], name="", description="")
             od[selected[0]] = record
-        with open(os.path.join(cwd,"pages", "Apps", "download", "selected.fasta"), 'w') as handle:
+        with open(os.path.join(cwd,"pages", "Apps", "download", f"{session_id}_selected.fasta"), 'w') as handle:
             SeqIO.write(od.values(), handle, 'fasta')
 
     @dashapp.callback(
-        Output("simple_tree_fasta_download", "children"),
-        Input('simple_tree_fasta_button', 'n_clicks'),
+        Output("simple_tree_tree_figure", "children"),
+        Input('simple_tree_aln_button', 'n_clicks'),
         State('simple_tree_gene_list', 'value'))
-    def simple_tree_fasta_update(n_clicks, value):
-        print(session_id)
+    def alignment_update(clicks, value):
+        import random
+        import string
+        session_id = ''.join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
+
         # Not sure why this callback is triggered when loading the app. This is a way out.
         if callback_context.triggered[0]["prop_id"] == ".":
             return(html.P("Insert list of genes to generate the fasta file."))
 
-        print("Start simple_tree fasta update")
         gene_list = value.split("\n")
         if len(gene_list) > 50:
             gene_list = gene_list[:50]
@@ -117,46 +109,31 @@ def register_callbacks(dashapp):
             gene_list = gene_list[:-1]
         try:
             con = sqlite3.connect(sqnce_path)
-            simple_tree_write_fasta(con, gene_list)
+            simple_tree_write_fasta(con, gene_list, session_id)
             #print("ran protein")
             con.close()
             # uses a separate function to generate the download link
-            return [html.Li(file_download_link("selected.fasta"))]
         except:
             return(html.P("Something did not work writing the fasta file"))
 
-    # https://stackoverflow.com/questions/54443531/downloading-dynamically-generated-files-from-a-dash-flask-app
-    def file_download_link(filename):
-        """Create a Plotly Dash 'A' element that downloads a file from the app."""
-        app_path = os.path.join(cwd, "pages", "Apps")
-        location = "/{}".format(urlquote(filename))
-        return html.A(filename, href=location)
-
-    @dashapp.callback(
-        Output("simple_tree_aln_download", "children"),
-        Output("simple_tree_tree_download", "children"),
-        Output("simple_tree_tree_png_download", "children"),
-        Output("simple_tree_tree_figure", "src"),
-        [Input('simple_tree_aln_button', 'n_clicks')])
-    def alignment_update(clicks):
         ctx = dash.callback_context
         if (not ctx.triggered and not ctx.triggered[0]['value'] == 0):
-            return (no_update, no_update, no_update, no_update)
+            return (no_update)
         if clicks is not None:
             try:
                 app_path = os.path.join(cwd,"pages", "Apps")
                 print("running famsa") # Needs: chmod a+x famsa
-                subprocess.run([app_path+"/./famsa "+app_path+"/download/selected.fasta "+app_path+"/download/selected.aln", "arguments"], shell=True)
+                subprocess.run([app_path+"/./famsa "+app_path+f"/download/{session_id}_selected.fasta "+app_path+f"/download/{session_id}_selected.aln", "arguments"], shell=True)
                 print("running clipkit") # Needs pip or conda install, make sure I didn't use binary when deployed
-                subprocess.run(["clipkit "+app_path+"/download/selected.aln", "arguments"], shell=True)
+                subprocess.run(["clipkit "+app_path+f"/download/{session_id}_selected.aln", "arguments"], shell=True)
                 print("running fasttree") # Needs: chmod a+x fasttree
-                subprocess.run([app_path+"/./fasttree  "+app_path+"/download/selected.aln.clipkit > "+app_path+"/download/selected.tree", "arguments"], shell=True)
+                subprocess.run([app_path+"/./fasttree  "+app_path+f"/download/{session_id}_selected.aln.clipkit > "+app_path+f"/download/{session_id}_selected.tree", "arguments"], shell=True)
                 ########################################
                 # Now we should have a tree and an alignment file in the download folder
                 # In 3.x, there is no longer a .next method; use the built-in function:
-                tree = next(Phylo.parse(app_path+'/download/selected.tree', 'newick'))
+                tree = next(Phylo.parse(app_path+f'/download/{session_id}_selected.tree', 'newick'))
                 tree.root_at_midpoint() # operates in-place
-                align = AlignIO.read(app_path+"/download/selected.aln", "fasta")
+                align = AlignIO.read(app_path+f"/download/{session_id}_selected.aln", "fasta")
                 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, len(align)), constrained_layout=True)
                 #fig.suptitle('Horizontally stacked subplots')
                 # https://stackoverflow.com/questions/29419973/in-python-how-can-i-change-the-font-size-of-leaf-nodes-when-generating-phylogen
@@ -189,16 +166,14 @@ def register_callbacks(dashapp):
                 #plt.figure(figsize=(20, 6))
                 Phylo.draw(tree, axes=ax1, do_show=False)
                 #ax.add_patch(Rectangle((box_width, box_width), 2, 6))
-                fig.savefig(app_path+"/download/selected_tree_aln.png")
+                fig.savefig(app_path+f"/download/{session_id}_selected_tree_aln.png")
                 ########################################
-                aln_file = [html.Li(file_download_link("selected.aln"))]
-                tree_file = [html.Li(file_download_link("selected.tree"))]
-                figure_file = [html.Li(file_download_link("selected_tree_aln.png"))]
-                return aln_file, tree_file, figure_file, fig_to_uri(fig)
+                return(html.Img(src = fig_to_uri(fig)))
+                #return 
             except:
-                input_value = "Make sure a fasta file exists"
+                return(html.P("Something did not work creating the image."))
 
-            return(input_value)
+            
 
     def alignment_to_range_list(alignment):
         # function takes a single sequence from an alignment

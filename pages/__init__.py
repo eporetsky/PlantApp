@@ -54,24 +54,6 @@ def register_dashapp(app, title, base_pathname, layout, register_callbacks_fun):
                            #meta_tags=[meta_viewport]
                            )
 
-    # Can't get this router function to work
-    if title == "apps":
-        print("Trying to register router")
-        router = Router()
-        router.register_callbacks(my_dashapp)
-        
-        if "plantapp" not in os.getcwd().lower():
-            UPLOAD_DIRECTORY = "/home/eporetsky/plantapp/pages/Apps/download" # for server hosting
-        else:
-            UPLOAD_DIRECTORY = os.path.join(os.getcwd(), "pages", "Apps", "download") # for personal computer
-        print("Router upload dir:", UPLOAD_DIRECTORY)
-        @router.route('/apps/download/<path:path>')
-        def download(path):
-            """Serve a file from the upload directory."""
-            print("If triggered path is:", path)
-            return send_from_directory(UPLOAD_DIRECTORY, path, as_attachment=True)
-
-
     with app.app_context():
         my_dashapp.title = title
         my_dashapp.layout = layout
