@@ -27,9 +27,31 @@ def register_callbacks(dashapp):
         cwd = os.getcwd() # for personal computer
     sqnce_path = os.path.join(cwd, "SQNce.db")
     
+    @dashapp.callback(Output('page-content', 'children'),
+                      Input('sqnce_url', 'pathname'))
+    def display_page(pathname):
+        pathname = pathname.split("/")[-1]
+        print("Current SQNce URL is:", pathname)
+        if pathname == "available_dbs":
+            return tab_avaialble_dbs
+        elif pathname == "annotations":
+            return tab_annotation_content
+        elif pathname == "families_familyIDs":
+            return tab_family_familyIDs_content
+        elif pathname == "families_geneIDs":
+            return tab_family_geneIDs_content
+        elif pathname == "proteins":
+            return tab_protein_content
+        elif pathname == "promoters":
+            return tab_promoter_content
+        elif pathname == "coordinates":
+            return tab_coordinates_content
+        elif pathname == "omics":
+            return tab_omics_content
+
     # Button trigger context: https://stackoverflow.com/questions/62119605/dash-how-to-callback-depending-on-which-button-is-being-clicked
     @dashapp.callback(
-        Output("tab_content", "children"), 
+        Output("tab_content", "children"),
         [Input("available_dbs", "n_clicks"),
         Input("annotations", "n_clicks"),
         Input("families_familyIDs", "n_clicks"),
@@ -40,6 +62,7 @@ def register_callbacks(dashapp):
         Input("omics", "n_clicks"),]
         )
     def switch_tab(*args):
+        print()
         trigger = callback_context.triggered[0]
         trigger = trigger["prop_id"].split(".")[0]
         if trigger == "available_dbs":
@@ -84,6 +107,7 @@ def register_callbacks(dashapp):
     ###############################################################################
 
     tab_coordinates_content = html.Div([
+
         # Get a list of unique genotypes from the db
         dcc.Dropdown(
             id='coordinates_genotypes_dropdown',
