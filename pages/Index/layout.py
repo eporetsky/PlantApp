@@ -3,34 +3,58 @@ from dash import Dash, dcc, html, Input, Output, State, dash_table
 
 PLOTLY_LOGO = "https://images.plot.ly/logo/new-branding/plotly-logomark.png"
 
-layout = dbc.Container(
-    [
-        dcc.Store(id="store"),
+layout = html.Div([
+    dcc.Location(id='url', refresh=False),
+    # Use a row instead of a number and add cute buttons
+    dbc.Navbar([
+    #dbc.Container([
+        html.Img(src=PLOTLY_LOGO, height="40px"),
+        html.P("...", style={"color": "transparent"}),
+        #dbc.NavItem(dbc.NavbarBrand("PlantApp")),
+        #dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
 
-        #html.H1("Dynamically rendered tab content"),
-        #html.Hr(),
-
-    dbc.Navbar(
-        children = [
-            html.A(
-                # Use row and col to control vertical alignment of logo / brand
-                dbc.Row(
-                    [dbc.Col(html.Img(src=PLOTLY_LOGO, height="30px")),
-                    dbc.Col(dbc.NavbarBrand("PlantApp", className="ml-2")),
-                    dbc.Col(dbc.NavLink("About", href="/about/", className="ml-2", external_link=True)),
-                    dbc.Col(dbc.NavLink("SQNce", href="/SQNce/", className="ml-2", external_link=True)),
-                    dbc.Col(dbc.NavLink("Apps", href="/apps/", className="ml-2", external_link=True)),
-                    dbc.Col(dbc.NavLink("Downloads", href="/downloads/", className="ml-2", external_link=True)),
-                    dbc.Col(dbc.NavLink("Feedback", href="/feedback/", className="ml-2", external_link=True)),
-                    ],
-                    align="center",# no_gutters=True,
-                ),
-                href="/",
-            ),
-            dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
-            #dbc.Collapse(search_bar, id="navbar-collapse", navbar=True, is_open=False),
+        dbc.Button("About", id="about", outline=False, color="primary", className="m-1", external_link=True, href="/about"),
+        dbc.DropdownMenu(
+            [dbc.DropdownMenuItem("Available DBs", id="available_dbs", external_link=True, href="/SQNce/available_dbs"),
+            dbc.DropdownMenuItem(divider=True),
+            dbc.DropdownMenuItem("Gene Descriptions", header=True),
+            dbc.DropdownMenuItem("Annotations", id="annotations", external_link=True, href="/SQNce/annotations"),
+            dbc.DropdownMenuItem("Gene Symbols", id="symbols", disabled=True),
+            dbc.DropdownMenuItem("Get Genes from Family Names", id="families_familyIDs", external_link=True, href="/SQNce/families_familyIDs"),
+            dbc.DropdownMenuItem("Get Family Names of Genes", id="families_geneIDs", external_link=True, href="/SQNce/families_geneIDs"),
+            dbc.DropdownMenuItem(divider=True),
+            dbc.DropdownMenuItem("Gene Relations", header=True),
+            dbc.DropdownMenuItem("Blast Best Hits (BBHs)", id="BBHs", external_link=True, href="/SQNce/BBHs"),
+            dbc.DropdownMenuItem(divider=True),
+            dbc.DropdownMenuItem("Gene Coordinates", header=True),
+            dbc.DropdownMenuItem("Coordinates", id="coordinates", external_link=True, href="/SQNce/coordinates"),
+            dbc.DropdownMenuItem(divider=True),
+            dbc.DropdownMenuItem("Gene Sequences", header=True),
+            dbc.DropdownMenuItem("Sequences", id="proteins", external_link=True, href="/SQNce/proteins"),
+            dbc.DropdownMenuItem("Promoters", id="promoters", external_link=True, href="/SQNce/promoters"),
+            dbc.DropdownMenuItem(divider=True),
+            dbc.DropdownMenuItem("Transcriptomic Data", header=True),
+            dbc.DropdownMenuItem("Transcriptomic Meta-data", header=True),
+            dbc.DropdownMenuItem("Omics", id="omics", external_link=True, href="/SQNce/omics"),
+            ], label="SQNce", color="primary", className="m-1",
+            toggle_style={"background": "transparent","border-color": "#f8f9fa"},
+        ),
+        dbc.DropdownMenu(
+            [dbc.DropdownMenuItem("Simple Tree", id="simple_tree", external_link=True, href="/apps/simple_tree"),
+            dbc.DropdownMenuItem("GO Enrichment", id="go_enrichment", disabled=True),
+            ], label="Apps", color="secondary", className="m-1",
+            toggle_style={"background": "transparent","border-color": "#f8f9fa"},
+        ),
+        dbc.Button("Downloads", id="downloads", outline=True, color="secondary",
+                    className="m-1", disabled=True),
+        dbc.Button("Feedback", id="feedback", outline=True, color="secondary",
+                    className="m-1", disabled=True),
         ],
-    color="dark", dark=True,
+        #align="start",
+        #style={"margin-left": "15px"}
+        dark =True,
+        color="dark",
+        sticky = True,
     ),
 
     dbc.Row(
@@ -42,26 +66,12 @@ layout = dbc.Container(
                 dcc.Markdown('''
                     ## Welcome to PlantApp
 
-                    The genomic resources for plants are rapidly expending. There are
-                    hundreds of sequenced genomes across the genetic diversity of the plant kindgdom and within the 
-                    genetic diversity of individual species. Each sequenced genome comes with useful human- and machine-
-                    friendly gene annotation files. PlantApp uses [SQNce](https://github.com/eporetsky/SQNce), 
-                    a SQLite-based database framework for parsing commonly used gene-annotation files. SQNce enables the generation 
-                    of single, uniform, database that can is fast to generate and query. PlantApp aggregates publicly 
-                    available data from sequenced plants and offers an easy-to-access and easy-to-download database. 
-
-                    Both PlantApp and SQNce are currently under development and are constantly being updated. At this developmental
-                    phase I am primarily relying on the [Phytozome](https://phytozome-next.jgi.doe.gov/) annotation files. 
-                    For requests or issue report e-mail me at eporetsky at ucsd.edu or message me on Twitter @externelly.
-
-                    I am currently focusing on including all the sequenced maize genomes available on MaizeGDB and some representatives 
-                    plant species from JGI Phytozome. For these and future included genomes the annotation effort for each gene will
-                    focus on a single representative primary transcript. Phytozome genome files include curated primary transcript
-                    files that I inted to use. In the absence of primary transcript annotations I will use the longest transcripts
-                    to begin with but will work on selecting a transcript that best matches Phytozome primary transcript in a closely
-                    related genome.
+                    PlantApp contains different tools for comparative genomics analysis and it uses [SQNce](https://github.com/eporetsky/SQNce),
+                    as a back-end. SQNce is a SQLite-based database framework for parsing commonly used gene-annotation files.
+                    PlantApp aggregates publicly available data from different sequenced plant species and genotypes and offers an
+                    easy-to-access and easy-to-download database.
                     ''')
-                ), 
+                ),
             width=6),
 
         dbc.Col(
@@ -71,15 +81,14 @@ layout = dbc.Container(
 
                     Will be added later.
                 '''
-                ), 
+                ),
             ),
         width=6),
         ]
     ),
     #html.Div(id="tab_content"),
 
-        
+
       #dbc.Row([table])
     ],
-    fluid=True  
 )

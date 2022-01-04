@@ -49,17 +49,12 @@ def register_callbacks(dashapp):
         cwd = os.getcwd() # for personal computer
     sqnce_path = os.path.join(cwd, "SQNce.db")
     
-    # Button trigger context: https://stackoverflow.com/questions/62119605/dash-how-to-callback-depending-on-which-button-is-being-clicked
-    @dashapp.callback(
-        Output("tab_content", "children"), 
-        [Input("simple_tree", "n_clicks"),]
-        )
-    def switch_tab(*args):
-        trigger = callback_context.triggered[0]
-        trigger = trigger["prop_id"].split(".")[0]
-        if trigger == "simple_tree":
+    @dashapp.callback(Output('tab_content', 'children'),
+                      Input('url', 'pathname'))
+    def display_page_content(pathname):
+        pathname = pathname.split("/")[-1]
+        if pathname == "simple_tree":
             return tab_simple_tree
-        return html.P("Select an App")
 
     tab_simple_tree = html.Div([
         dcc.Textarea(

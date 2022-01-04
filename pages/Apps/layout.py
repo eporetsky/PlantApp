@@ -3,43 +3,59 @@ from dash import Dash, dcc, html, Input, Output, State, dash_table
 
 PLOTLY_LOGO = "https://images.plot.ly/logo/new-branding/plotly-logomark.png"
 
-layout = dbc.Container(
-    [
-        dcc.Store(id="store"),
-
-        #html.H1("Dynamically rendered tab content"),
-        #html.Hr(),
-
-    dbc.Navbar(
-        children = [
-            html.A(
-                # Use row and col to control vertical alignment of logo / brand
-                dbc.Row(
-                    [dbc.Col(html.Img(src=PLOTLY_LOGO, height="30px")),
-                    dbc.Col(dbc.NavbarBrand("PlantApp", className="ml-2")),
-                    dbc.Col(dbc.NavLink("About", href="/about/", className="ml-2", external_link=True)),
-                    dbc.Col(dbc.NavLink("SQNce", href="/SQNce/", className="ml-2", external_link=True)),
-                    dbc.Col(dbc.NavLink("Apps", href="/apps/", className="ml-2", external_link=True)),
-                    dbc.Col(dbc.NavLink("Downloads", href="/downloads/", className="ml-2", external_link=True)),
-                    dbc.Col(dbc.NavLink("Feedback", href="/feedback/", className="ml-2", external_link=True)),
-                    ],
-                    align="center",# no_gutters=True,
-                ),
-                href="https://www.plantapp.org",
-            ),
-            dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
-            #dbc.Collapse(search_bar, id="navbar-collapse", navbar=True, is_open=False),
+layout = html.Div([ 
+    dcc.Location(id='url', refresh=False),
+    # Use a row instead of a number and add cute buttons
+    dbc.Navbar([
+    #dbc.Container([
+        html.Img(src=PLOTLY_LOGO, height="40px"),
+        html.P("...", style={"color": "transparent"}),
+        #dbc.NavItem(dbc.NavbarBrand("PlantApp")),
+        #dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
+        
+        dbc.Button("About", id="about", outline=True, color="light", className="m-1", external_link=True, href="/about"),
+        dbc.DropdownMenu(
+            [dbc.DropdownMenuItem("Available DBs", id="available_dbs", external_link=True, href="/SQNce/available_dbs"), 
+            dbc.DropdownMenuItem(divider=True),
+            dbc.DropdownMenuItem("Gene Descriptions", header=True),
+            dbc.DropdownMenuItem("Annotations", id="annotations", external_link=True, href="/SQNce/annotations"),
+            dbc.DropdownMenuItem("Gene Symbols", id="symbols", disabled=True),
+            dbc.DropdownMenuItem("Get Genes from Family Names", id="families_familyIDs", external_link=True, href="/SQNce/families_familyIDs"),
+            dbc.DropdownMenuItem("Get Family Names of Genes", id="families_geneIDs", external_link=True, href="/SQNce/families_geneIDs"),
+            dbc.DropdownMenuItem(divider=True),
+            dbc.DropdownMenuItem("Gene Relations", header=True),
+            dbc.DropdownMenuItem("Blast Best Hits (BBHs)", id="BBHs", external_link=True, href="/SQNce/BBHs"),
+            dbc.DropdownMenuItem(divider=True),
+            dbc.DropdownMenuItem("Gene Coordinates", header=True),
+            dbc.DropdownMenuItem("Coordinates", id="coordinates", external_link=True, href="/SQNce/coordinates"),
+            dbc.DropdownMenuItem(divider=True),
+            dbc.DropdownMenuItem("Gene Sequences", header=True),
+            dbc.DropdownMenuItem("Sequences", id="proteins", external_link=True, href="/SQNce/proteins"),
+            dbc.DropdownMenuItem("Promoters", id="promoters", external_link=True, href="/SQNce/promoters"),
+            dbc.DropdownMenuItem(divider=True),
+            dbc.DropdownMenuItem("Transcriptomic Data", header=True),
+            dbc.DropdownMenuItem("Transcriptomic Meta-data", header=True),
+            dbc.DropdownMenuItem("Omics", id="omics", external_link=True, href="/SQNce/omics"),
+            ], label="Apps", color="secondary", className="m-1",
+            toggle_style={"background": "transparent","border-color": "#f8f9fa"},
+        ),
+        dbc.DropdownMenu(
+            [dbc.DropdownMenuItem("Simple Tree", id="simple_tree", external_link=True, href="/apps/simple_tree"),
+            dbc.DropdownMenuItem("GO Enrichment", id="go_enrichment", disabled=True),
+            ], label="SQNce", color="primary", className="m-1",
+        ),
+        dbc.Button("Downloads", id="downloads", outline=True, color="secondary", 
+                    className="m-1", disabled=True),
+        dbc.Button("Feedback", id="feedback", outline=True, color="secondary", 
+                    className="m-1", disabled=True),
         ],
-    color="dark", dark=True,
+        #align="start",
+        #style={"margin-left": "15px"}
+        dark =True, 
+        color="dark",
+        sticky = True,
     ),
-
-    html.A(dbc.Row([
-        dbc.Button("Simple Tree", id="simple_tree", className="me-1"),
-    ])),
-
- 
     html.Div(id="tab_content"),
-
     ],
-    fluid=True  
+    #fluid=True,
 )

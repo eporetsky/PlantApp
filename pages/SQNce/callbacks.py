@@ -27,11 +27,10 @@ def register_callbacks(dashapp):
         cwd = os.getcwd() # for personal computer
     sqnce_path = os.path.join(cwd, "SQNce.db")
     
-    @dashapp.callback(Output('page-content', 'children'),
-                      Input('sqnce_url', 'pathname'))
-    def display_page(pathname):
+    @dashapp.callback(Output('tab_content', 'children'),
+                      Input('url', 'pathname'))
+    def display_page_content(pathname):
         pathname = pathname.split("/")[-1]
-        print("Current SQNce URL is:", pathname)
         if pathname == "available_dbs":
             return tab_avaialble_dbs
         elif pathname == "annotations":
@@ -40,6 +39,8 @@ def register_callbacks(dashapp):
             return tab_family_familyIDs_content
         elif pathname == "families_geneIDs":
             return tab_family_geneIDs_content
+        elif pathname == "BBHs":
+            return tab_BBHs_content
         elif pathname == "proteins":
             return tab_protein_content
         elif pathname == "promoters":
@@ -48,40 +49,6 @@ def register_callbacks(dashapp):
             return tab_coordinates_content
         elif pathname == "omics":
             return tab_omics_content
-
-    # Button trigger context: https://stackoverflow.com/questions/62119605/dash-how-to-callback-depending-on-which-button-is-being-clicked
-    @dashapp.callback(
-        Output("tab_content", "children"),
-        [Input("available_dbs", "n_clicks"),
-        Input("annotations", "n_clicks"),
-        Input("families_familyIDs", "n_clicks"),
-        Input("families_geneIDs", "n_clicks"),
-        Input("coordinates", "n_clicks"),
-        Input("proteins", "n_clicks"),
-        Input("promoters", "n_clicks"),
-        Input("omics", "n_clicks"),]
-        )
-    def switch_tab(*args):
-        print()
-        trigger = callback_context.triggered[0]
-        trigger = trigger["prop_id"].split(".")[0]
-        if trigger == "available_dbs":
-            return tab_avaialble_dbs
-        elif trigger == "annotations":
-            return tab_annotation_content
-        elif trigger == "families_familyIDs":
-            return tab_family_familyIDs_content
-        elif trigger == "families_geneIDs":
-            return tab_family_geneIDs_content
-        elif trigger == "proteins":
-            return tab_protein_content
-        elif trigger == "promoters":
-            return tab_promoter_content
-        elif trigger == "coordinates":
-            return tab_coordinates_content
-        elif trigger == "omics":
-            return tab_omics_content
-        return html.P("This shouldn't ever be displayed...")
 
     ###############################################################################
     #                                Helper Functions
@@ -410,9 +377,9 @@ def register_callbacks(dashapp):
     tab_family_familyIDs_content = html.Div([
         dcc.Dropdown(
             id='family_select_species_dropdown',
-            options=distinct_db_vals(sqnce_path, "gene_families", "species_id", 
+            options=distinct_db_vals(sqnce_path, "gene_families", "genotype_id", 
                                     [["All", "all"]]),
-            value=None,
+            value="all",
             multi=True,
             searchable=True
         ),
@@ -438,13 +405,13 @@ def register_callbacks(dashapp):
     def family_familyIDs_table(_, genotypes, families):
         con = sqlite3.connect(sqnce_path) # deploy with this
         cursorObj = con.cursor()
-        if  "all" in genotypes:
-            genotypes = distinct_db_vals(sqnce_path, "gene_families", "species_id", return_ls=True) 
+        if  "all" in genotypes or genotypes == "all":
+            genotypes = distinct_db_vals(sqnce_path, "gene_families", "genotype_id", return_ls=True) 
         genotypes = str("','".join(genotypes))
         families = str("','".join(families))
-        df = pd.read_sql_query("""SELECT protein_id, family_name 
+        df = pd.read_sql_query("""SELECT protein_id, genotype_id, family_name 
                                 FROM gene_families
-                                WHERE species_id IN ('{0}') AND family_name IN ('{1}')""".format(genotypes, families), con)
+                                WHERE genotype_id IN ('{0}') AND family_name IN ('{1}')""".format(genotypes, families), con)
         try:
             return dash_table.DataTable(
                 id="family_table_state",
@@ -471,18 +438,21 @@ def register_callbacks(dashapp):
     
     def family_gene_select(con, gene_list):
         # Use an input list of genes to find their family assignments
-        ls = []
+        genotype_ls = []
+        family_ls = []
         for gene in gene_list:
             cursorObj = con.cursor()
-            cursorObj.execute('''SELECT protein_id, family_name 
+            cursorObj.execute('''SELECT genotype_id, family_name 
                                 FROM gene_families
                                 WHERE protein_id =  ? ''', (gene,))
             selected = cursorObj.fetchall()
             if selected == []:
-                ls.append("Gene not found")
+                genotype_ls.append("Gene not found")
+                family_ls.append("Gene not found")
             else:
-                ls.append(selected[0][1])    
-        return(ls)
+                genotype_ls.append(selected[0][0])
+                family_ls.append(selected[0][1])
+        return([genotype_ls, family_ls])
     
     @dashapp.callback(
         Output("family_geneIDs_table", "children"),
@@ -499,7 +469,8 @@ def register_callbacks(dashapp):
         except:
             return(html.P("Something did not work reading the gene list"))
         try:
-            output_df = pd.DataFrame({"GeneID": gene_list, "FamilyID": family_gene_select(con, gene_list) })
+            db_output = family_gene_select(con, gene_list)
+            output_df = pd.DataFrame({"GeneID": gene_list, "Genotype ID": db_output[0], "FamilyID": db_output[1] })
             # output_df.columns = ["GeneID", "FamilyID"]
             return dash_table.DataTable(
                 id="family_table_state",
@@ -513,11 +484,87 @@ def register_callbacks(dashapp):
                 row_deletable=True,)
         except:
             return(html.P("Something did not work returning the table"))
-    
 
-            
+    ###############################################################################
+    #                                BBHs
+    ###############################################################################
+    BBHs_query_genotype_list = pd.read_csv(os.path.join(cwd,"init/BBHs_combs.tsv"), sep="\t")
+    BBHs_query_genotype_list = list(BBHs_query_genotype_list["query"].unique())
+    tab_BBHs_content = html.Div([
+        dcc.Dropdown(
+            id='dropdown_BBHs_column_select',
+            options=[{'label': "Search in Reference Gene IDs (B73v4 and Col-0)", 'value': 'subject_id'},
+                     {'label': "Search in All Queried Genomes", 'value': 'query_id'}],
+            value="subject_id"
+        ),
+        dcc.Dropdown(
+            id='dropdown_BBHs_query_genotype_select',
+            options=[{'label': qg, 'value': qg} for qg in BBHs_query_genotype_list],
+            value="All",
+            multi=True,
+            searchable=True,
+        ),
+        dcc.Dropdown(
+            id='dropbox_show_best_only',
+            options=[{'label': "Show Best Blast Hit Only", 'value': 'only'},
+                     {'label': "Show Top Best Blast Hits", 'value': 'all'}],
+            value="only"
+        ),
+
+        dcc.Textarea(
+            id='BBHs_gene_list',
+            value='Inert gene IDs to search for, one row per gene.',
+            style={'width': '100%', 'height': 100},
+        ),
+        html.Div(id="BBHs_table"),
+        html.Div(id="BBHs_missing")
+        ])
 
     
+        # selected: variable to select either subject_id or query_id from BBHs table
+    @dashapp.callback(
+        Output("BBHs_table", "children"),
+        Output("BBHs_missing", "children"),
+        Input("dropdown_BBHs_column_select", "value"),
+        Input("dropdown_BBHs_query_genotype_select", "value"),
+        Input("dropbox_show_best_only", "value"),
+        Input("BBHs_gene_list", "value"),
+        
+    )
+    def BBHs_select(selected, genotypes, show_best_only, entity_list):
+        gene_list = entity_list.split("\n")
+        if len(gene_list) > 500:
+            gene_list = gene_list[:500]
+        if gene_list[-1]=="":
+            gene_list = gene_list[:-1]
+        
+        con = sqlite3.connect(sqnce_path) # deploy with this
+        cursorObj = con.cursor()
+        gene_list_str = str("','".join(gene_list))
+        df = pd.read_sql_query("""SELECT * 
+                        FROM BBHs
+                        WHERE {0} IN ('{1}')""".format(selected, gene_list_str), con)
+        try:
+            if "All" not in genotypes:
+                df = df[df["query_genotype"].isin(genotypes)]
+            if show_best_only == "only":
+                # This is a stupid function but it seems to work correctly.
+                df = df.sort_values(['bit_score'], ascending=False).groupby(["subject_id", "query_genotype"]).agg({"bit_score": "first", "query_id": "first",}).reset_index()
+            missing_str = ''
+            for gene in gene_list:
+                if gene not in list(df["subject_id"]):
+                    missing_str = missing_str + gene + ", "
+            return dash_table.DataTable(
+                    columns=[{"name": i, "id": i} for i in df.columns],
+                    data=df.to_dict('records'),
+                    style_cell={'textAlign': 'left',
+                                'overflow': 'hidden',
+                                'maxWidth': 0,},
+                    editable=True,
+                    row_deletable=True,), html.P("The following were not found: "+missing_str),
+        except:
+            return(html.P("Something did not work returning"),
+                   html.P("the Best Blast Hits."))
 
     ###############################################################################
     #                                Protein Sequences
@@ -549,8 +596,6 @@ def register_callbacks(dashapp):
             # (name,) - need the comma to treat it as a single item and not list of letters
             selected = cursorObj.fetchall()[0]
             od[selected[0]] = zlib.decompress(selected[1]).decode('utf-8')[:-1] 
-            #od[selected[0]] = selected[1][:-1]
-            #print(od)
         return(od)
 
     @dashapp.callback(
