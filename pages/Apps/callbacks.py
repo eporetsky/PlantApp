@@ -55,6 +55,13 @@ def register_callbacks(dashapp):
         pathname = pathname.split("/")[-1]
         if pathname == "simple_tree":
             return tab_simple_tree
+        if pathname == "genome_graph":
+            return tab_genome_graph
+
+    ###############################################################################
+    #                                Simple Tree
+    ###############################################################################
+
 
     tab_simple_tree = html.Div([
         dcc.Textarea(
@@ -164,7 +171,6 @@ def register_callbacks(dashapp):
                 fig.savefig(app_path+f"/download/{session_id}_selected_tree_aln.png")
                 ########################################
                 return(html.Img(src = fig_to_uri(fig)))
-                #return 
             except:
                 return(html.P("Something did not work creating the image."))
 
@@ -192,6 +198,156 @@ def register_callbacks(dashapp):
         if len(range_list)%2:
             range_list.append(len(alignment))
         return range_list
+
+    
+
+
+    ###############################################################################
+    #                                Genome Graph
+    ###############################################################################
+
+    tab_genome_graph = html.Div([
+        # Get a list of unique genotypes from the db
+        dcc.Dropdown(
+            id='genome_graph_genotypes_dropdown',
+            options=[
+                {'label': 'B73v4', 'value': "B73v4"},
+                {'label': 'Arabidopsis', 'value': "Arabidopsis"},
+            ],
+            value="None"
+        ),
+
+        dcc.Textarea(
+                id='genome_graph_list',
+                value='Paste gene list or coordiantes (tab separated Chromsome and Location',
+                style={'width': '100%', 'height': 100},
+                ),
+        html.Button('Prepare genome graph figure', id='genome_graph_button', type='submit'),
+        html.Div(id='genome_graph_figure'),
+        #html.Div([html.Img(id = 'simple_tree_tree_figure', src = '')], id='plot_div'),
+        ])
+
+    # Query to find neighboring genes
+    def get_gene_coordinates(genotype, gene_id):
+        con = sqlite3.connect(sqnce_path) # deploy with this
+        cursorObj = con.cursor()
+        df = pd.read_sql_query('''SELECT * 
+                        FROM gene_coordinates 
+                        WHERE genotype_id = "{0}"
+                        AND gene_id = "{1}"
+                        '''.format(genotype, gene_id), con)
+        return(df)
+
+    @dashapp.callback(
+        Output("genome_graph_figure", "children"),
+        Input('genome_graph_button', 'n_clicks'),
+        Input("genome_graph_genotypes_dropdown", 'value'),   
+        State('genome_graph_list', 'value'))
+    def genome_graph_update(clicks, genotype, gene_list):
+        import random
+        import string
+        session_id = ''.join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
+        app_path = os.path.join(cwd,"pages", "Apps")
+        # Not sure why this callback is triggered when loading the app. This is a way out.
+        if callback_context.triggered[0]["prop_id"] == ".":
+            return(html.P("Insert list of genes to generate the fasta file."))
+
+        gene_list = gene_list.split("\n")
+        if len(gene_list) > 500:
+            gene_list = gene_list[:500]
+        if gene_list[-1]=="":
+            gene_list = gene_list[:-1]
+        try:
+            # Get the gene coordinates for the genome graph
+            coords = pd.DataFrame()
+            for gene in gene_list:
+                coords = pd.concat([coords, get_gene_coordinates(genotype, gene)])
+        except:
+            return(html.P("Something did not work writing the fasta file"))
+        ctx = dash.callback_context
+        if (not ctx.triggered and not ctx.triggered[0]['value'] == 0):
+            return (no_update)
+        if clicks is not None:
+            try:
+                from reportlab.lib.units import cm
+                from reportlab.graphics import renderPM
+                from Bio import SeqIO
+                from Bio.Graphics import BasicChromosome
+                df = pd.read_csv(os.path.join(app_path, "chromosome.tsv"), sep="\t")
+                selected = df[df["genotype_id"]==genotype]
+                entries = selected[["chr", "len"]].values.tolist()
+                max_len = selected["len"].max()
+                telomere_length = 0
+                chr_diagram = BasicChromosome.Organism()
+                chr_diagram.page_size = (29.7 * cm, 21 * cm)  # A4 landscape
+
+                for index, (name, length) in enumerate(entries):
+                    
+                    # For each chrosome generate a feature list of tuples (start, start, strand, name, color,)
+                    features = []
+                    for row in coords[coords["gene_chr"]==name].values:
+                        features.append((row[3], row[3], None, row[0], "black",))
+                    cur_chromosome = BasicChromosome.Chromosome(name)
+                    # Set the scale to the MAXIMUM length plus the two telomeres in bp,
+                    # want the same scale used on all five chromosomes so they can be
+                    # compared to each other
+                    cur_chromosome.scale_num = max_len + 2
+
+                    # Record an Artemis style integer color in the feature's qualifiers,
+                    # 1 = Black, 2 = Red, 3 = Green, 4 = blue, 5 =cyan, 6 = purple
+                    
+                    # The features can either be SeqFeature objects, or tuples of values: start (int), 
+                    # end (int), strand (+1, -1, O or None), label (string), ReportLab color (string or object), 
+                    # and optional ReportLab fill color.
+                    
+                    # This will it to every chromsome. Make chromsome specific lists
+                    
+                    # Add an opening telomere
+                    start = BasicChromosome.TelomereSegment()
+                    start.scale = telomere_length
+                    cur_chromosome.add(start)
+                    
+                    # Add a body - again using bp as the scale length here.
+                    body = BasicChromosome.AnnotatedChromosomeSegment(length, features)
+                    body.scale = length
+                    cur_chromosome.add(body)
+                    
+                    # Add a closing telomere
+                    end = BasicChromosome.TelomereSegment(inverted=True)
+                    end.scale = telomere_length
+                    cur_chromosome.add(end)
+                    
+                    # This chromosome is done
+                    chr_diagram.add(cur_chromosome)
+                pdf_path = os.path.join(app_path, "download", f"{session_id}_genome_graph.pdf")
+                chr_diagram.draw(pdf_path, "Genome Diagram")
+                fig = chr_diagram.draw(None, "Genome Diagram")
+                #print(os.path.join(app_path,"download", f"{session_id}_genome_graph.png"))
+
+                #print(os.path.join(cwd,"download", "Apps", f"{session_id}_genome_graph.png"))
+                # This saves it as a png file, which I think that I don't need to draw it on page
+                #fig = renderPM.drawToFile(fig, pdf_path.replacte("pdf", "png"), 'PNG')
+                print("final test")
+
+                with open(pdf_path, 'rb') as pdf:
+                    pdf_data = base64.b64encode(pdf.read()).decode('utf-8')
+
+
+                #return(html.Iframe(id="embedded-pdf", src=pdf_path))
+                return(
+                    html.ObjectEl(
+                        # To my recollection you need to put your static files in the 'assets' folder
+                        data='data:application/pdf;base64,'+ pdf_data,
+                        type="application/pdf",
+                        style={"width": "100%", "height": "1000px"}
+                         ),
+                )
+                    
+                    
+                #return(html.Img(src = fig_to_uri(fig)))
+            except:
+                return(html.P("Something did not work creating the image."))
+
 
     def fig_to_uri(in_fig, close_all=True, **save_args):
         # type: (plt.Figure) -> str

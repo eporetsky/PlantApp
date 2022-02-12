@@ -19,6 +19,7 @@ def register_callbacks(dashapp):
 
     import os
     import zlib
+    import duckdb
 
     # Set the cwd and SQNce.db path to be platform independent  
     if "plantapp" not in os.getcwd().lower():
@@ -47,6 +48,8 @@ def register_callbacks(dashapp):
             return tab_promoter_content
         elif pathname == "coordinates":
             return tab_coordinates_content
+        elif pathname == "transcriptomics":
+            return tab_transcriptomics_content
         elif pathname == "omics":
             return tab_omics_content
 
@@ -744,5 +747,52 @@ def register_callbacks(dashapp):
         output = dff.to_csv(index=False, header=False, escapechar="#", quoting=csv.QUOTE_NONE, line_terminator="\n").replace("#", "")
         return dict(content=output, filename="output.fasta")
 
-    
+    ###############################################################################
+    #                                Transcriptomics
+    ###############################################################################
+
+    tab_transcriptomics_content = html.Div([
+        dcc.Textarea(
+            id='transcriptomics_gene_list',
+            value='Textarea content initialized\nwith multiple lines of text',
+            style={'width': '100%', 'height': 100},
+            ),
+
+        html.Div(id="transcriptomics_annotation_table"),
+        ])
+
+    def transcriptomic_select(entity_list):
+        ls = []
+        con = duckdb.connect(database=os.path.join(cwd, "SQNce.duckdb"), read_only=True)
+        # Read csv file as pandas dataframe
+        query_list = str("','".join(entity_list))
+        df = con.execute("""SELECT * FROM PanNAM
+                            WHERE target_id IN ('{0}');""".format(query_list)).fetchdf()
+        return(df)
+
+    @dashapp.callback(
+        Output('transcriptomics_annotation_table', 'children'),
+        Input('transcriptomics_gene_list', 'value'))
+    def get_gene_list(value):
+        try:
+            gene_list = value.split("\n")
+            if len(gene_list) > 500:
+                gene_list = gene_list[:500]
+            if gene_list[-1]=="":
+                gene_list = gene_list[:-1]
+        except:
+            return(html.P("Something did not work reading the gene list"))
+        try:
+            output_df = transcriptomic_select(gene_list)
+            return dash_table.DataTable(
+                columns=[{"name": i, "id": i} for i in output_df.columns],
+                data=output_df.to_dict('records'),
+                style_cell={'textAlign': 'left',
+                            'overflow': 'hidden',
+                            'textOverflow': 'ellipsis',
+                            'maxWidth': 0,},
+                editable=True,
+                row_deletable=True,)
+        except:
+            return(html.P("Something did not work returning the table"))
         

@@ -41,6 +41,7 @@ layout = html.Div([
         ),
         dbc.DropdownMenu(
             [dbc.DropdownMenuItem("Simple Tree", id="simple_tree", external_link=True, href="/apps/simple_tree"),
+            dbc.DropdownMenuItem("Genome Graph", id="genome_graph", external_link=True, href="/apps/genome_graph"),
             dbc.DropdownMenuItem("GO Enrichment", id="go_enrichment", disabled=True),
             ], label="Apps", color="secondary", className="m-1",
             toggle_style={"background": "transparent","border-color": "#f8f9fa"},
