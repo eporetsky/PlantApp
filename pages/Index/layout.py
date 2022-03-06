@@ -13,7 +13,12 @@ layout = html.Div([
         #dbc.NavItem(dbc.NavbarBrand("PlantApp")),
         #dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
 
-        dbc.Button("About", id="about", outline=False, color="primary", className="m-1", external_link=True, href="/about"),
+        dbc.DropdownMenu(
+            [dbc.DropdownMenuItem("About", id="home_about", external_link=True, href="/about"),
+            dbc.DropdownMenuItem("Login", id="home_login", external_link=True, href="/login"),
+            ], label="Home", color="primary", className="m-1",
+        ),
+        
         dbc.DropdownMenu(
             [dbc.DropdownMenuItem("Available DBs", id="available_dbs", external_link=True, href="/SQNce/available_dbs"),
             dbc.DropdownMenuItem(divider=True),
@@ -36,7 +41,7 @@ layout = html.Div([
             dbc.DropdownMenuItem("Transcriptomic Data", header=True),
             dbc.DropdownMenuItem("Transcriptomic Meta-data", header=True),
             dbc.DropdownMenuItem("Omics", id="omics", external_link=True, href="/SQNce/omics"),
-            ], label="SQNce", color="primary", className="m-1",
+            ], label="SQNce", color="secondary", className="m-1",
             toggle_style={"background": "transparent","border-color": "#f8f9fa"},
         ),
         dbc.DropdownMenu(

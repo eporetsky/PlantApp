@@ -35,6 +35,8 @@ def register_callbacks(dashapp):
     from io import BytesIO
     import base64
 
+    from flask_login import current_user
+    from flask import session
 
     # import pandas as pd
     from plotly.tools import mpl_to_plotly
@@ -52,11 +54,14 @@ def register_callbacks(dashapp):
     @dashapp.callback(Output('tab_content', 'children'),
                       Input('url', 'pathname'))
     def display_page_content(pathname):
+        print(session.get('username', None))
         pathname = pathname.split("/")[-1]
         if pathname == "simple_tree":
             return tab_simple_tree
         if pathname == "genome_graph":
             return tab_genome_graph
+
+
 
     ###############################################################################
     #                                Simple Tree

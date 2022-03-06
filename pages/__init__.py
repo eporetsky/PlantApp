@@ -1,16 +1,27 @@
 import dash
-from flask import Flask
+from flask import Flask, render_template, redirect, url_for, request
 from flask.helpers import get_root_path
 
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, session
+
+from flask_login import LoginManager, login_user
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SubmitField
+
+from urllib.parse import urlparse, urljoin
+
 import dash_bootstrap_components as dbc
 import dash
 import pandas as pd 
 
-from dash_router import Router
 from config import BaseConfig
 
 import os
+
+class LoginForm(FlaskForm):
+    username = StringField('Username')
+    password = PasswordField('Password')
+    submit = SubmitField('Submit')
 
 def create_app():
     server = Flask(__name__)
@@ -28,6 +39,30 @@ def create_app():
     from pages.Apps.layout import layout as apps_layout
     from pages.Apps.callbacks import register_callbacks as register_app_callbacks
     register_dashapp(server, 'apps', 'apps', apps_layout, register_app_callbacks)
+
+    #login_manager = LoginManager()
+    #@login_manager.user_loader
+    #def load_user(user_id):
+    #    return User.get(user_id)
+
+    #def is_safe_url(target):
+    #    ref_url = urlparse(request.host_url)
+    #    test_url = urlparse(urljoin(request.host_url, target))
+    #    return test_url.scheme in ('http', 'https') and \
+    #        ref_url.netloc == test_url.netloc
+
+
+    # Route for handling the login page logic
+    @server.route('/login', methods=['GET', 'POST'])
+    def login():
+        error = None
+        if request.method == 'POST':
+            if request.form['username'] != 'admin' or request.form['password'] != 'admin':
+                error = 'Invalid Credentials. Please try again.'
+            else:
+                session['username'] = "admin"
+                return redirect(url_for('/'))
+        return render_template('login.html', error=error)
 
     #register_dashapp(server, 'Index', '/', layout1, register_callbacks1)
 
