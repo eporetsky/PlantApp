@@ -15,7 +15,10 @@ def register_callbacks(dashapp):
     import zlib
     import subprocess
     import zlib
-    import uuid
+    import base64
+    import io
+
+
 
     from collections import OrderedDict
 
@@ -54,12 +57,14 @@ def register_callbacks(dashapp):
     @dashapp.callback(Output('tab_content', 'children'),
                       Input('url', 'pathname'))
     def display_page_content(pathname):
-        print(session.get('username', None))
+        #print(session.get('username', None))
         pathname = pathname.split("/")[-1]
         if pathname == "simple_tree":
             return tab_simple_tree
         if pathname == "genome_graph":
             return tab_genome_graph
+        if pathname == "mapping_summary":
+            return tab_mapping_summary
 
 
 
@@ -230,7 +235,7 @@ def register_callbacks(dashapp):
         html.Button('Prepare genome graph figure', id='genome_graph_button', type='submit'),
         html.Div(id='genome_graph_figure'),
         #html.Div([html.Img(id = 'simple_tree_tree_figure', src = '')], id='plot_div'),
-        ])
+    ])
 
     # Query to find neighboring genes
     def get_gene_coordinates(genotype, gene_id):
@@ -355,7 +360,6 @@ def register_callbacks(dashapp):
 
 
     def fig_to_uri(in_fig, close_all=True, **save_args):
-        # type: (plt.Figure) -> str
         """
         Save a figure as a URI
         :param in_fig:
@@ -369,3 +373,224 @@ def register_callbacks(dashapp):
         out_img.seek(0)  # rewind file
         encoded = base64.b64encode(out_img.read()).decode("ascii").replace("\n", "")
         return "data:image/png;base64,{}".format(encoded)
+
+    ###############################################################################
+    #                                Mapping Summary
+    ###############################################################################
+    
+    tab_mapping_summary = html.Div([
+        html.Br(),
+        html.Div([
+            dbc.Row([
+                dbc.RadioItems(
+                    id="mapping_summary_select_menu",
+                    className="btn-group",
+                    inputClassName="btn-check",
+                    labelClassName="btn btn-outline-primary",
+                    labelCheckedClassName="active",
+                    options=[
+                        {"label": "Summarize Mapping Data", "value": 1},
+                        {"label": "Public Mapping Data", "value": 2},
+                        {"label": "User Mapping Data", "value": 3},
+                    ], value=1,
+                    ),
+                ], align="end",
+                ),
+        ], style={"height": "50px"},
+        ),
+        
+        html.Div(id="mapping_summary_select_menu_output")
+        
+    ]),
+
+    tab_mapping_summary_public = html.Div([
+        html.P("This is the public tab.")
+    ]),
+
+    tab_mapping_summary_user = html.Div([
+        html.P("This is the user tab.")
+    ]),
+
+    tab_mapping_summary_upload = html.Div([
+        html.P("This is the upload tab."),
+        dcc.Upload(
+            id='upload-image',
+            children=html.Div([
+                'Drag and Drop or ',
+                html.A('Select Files')
+            ]),
+            style={
+                'width': '100%',
+                'height': '60px',
+                'lineHeight': '60px',
+                'borderWidth': '1px',
+                'borderStyle': 'dashed',
+                'borderRadius': '5px',
+                'textAlign': 'center',
+                'margin': '10px'
+            },
+            # Allow multiple files to be uploaded
+            multiple=True
+        ),
+        html.Div(id='output-image-upload'),
+        html.Div(id='div_selected_table', style = {'max-width': '1200px'}),
+    ]),
+
+    tab_mapping_login_request = html.Div([
+        html.P("Please login for access.")
+    ])
+    
+    @dashapp.callback(Output("mapping_summary_select_menu_output", "children"), 
+                  Input("mapping_summary_select_menu", "value"))
+    def mapping_summary_display_page(value):
+        if value == 1:
+            return(tab_mapping_summary_upload)
+        if value == 2:
+            return(tab_mapping_summary_public)
+        if session.get('username', None)==None:
+            return(tab_mapping_login_request)
+        #print(session.get('username', None))
+        
+        if value == 3:
+            return(tab_mapping_summary_user)
+
+    def parse_contents(contents, filename, date):
+        if filename.split(".")[-1] in ["png", "jpg", "jpeg"]:
+            return html.Div([
+                html.H5(filename),
+                # HTML images accept base64 encoded strings in the same format
+                # that is supplied by the upload
+                
+                html.Img(src=contents, style={'width': '80%', 'height': 'auto'}),
+                html.Hr(),
+                html.Div('Raw Content'),
+                html.Pre(contents[0:200] + '...', style={
+                    'whiteSpace': 'pre-wrap',
+                    'wordBreak': 'break-all'
+                })
+                ], style = {'max-width': '1200px'})
+
+        if filename.split(".")[-1] == "csv":
+            contents = contents.split(',')[-1]
+            decoded = base64.b64decode(contents)
+            # Not sure if there's a better way to remove the file header "data:application/vnd.ms-excel;base64"
+            #print(decoded[0])
+            #decoded = decoded[0].split("base64,")[-1]
+            df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+            df = df.sort_values(df.columns[-1])
+            return html.Div([
+                html.H5(filename),
+                dash_table.DataTable(
+                    id='datatable-interactivity',
+                    columns=[{"name": i, "id": i, "deletable": True, "selectable": True} for i in df.columns],
+                    data=df.to_dict('records'),
+                    editable=False,
+                    filter_action="native",
+                    sort_action="native",
+                    sort_mode="multi",
+                    column_selectable="single",
+                    row_selectable="multi",
+                    row_deletable=True,
+                    selected_columns=[],
+                    selected_rows=[],
+                    page_action="native",
+                    page_current= 0,
+                    page_size= 10,
+                ),
+
+            ], style = {'max-width': '1200px'})
+
+    @dashapp.callback(
+              Output('output-image-upload', 'children'),
+             #Output('div_selected_table', 'children'),
+              Input('upload-image', 'contents'),
+              State('upload-image', 'filename'),
+              State('upload-image', 'last_modified'))
+    def update_output(list_of_contents, list_of_names, list_of_dates):
+        if list_of_contents is not None:
+            children = [
+                parse_contents(c, n, d) for c, n, d in
+                zip(list_of_contents, list_of_names, list_of_dates)]
+            return children
+
+    @dashapp.callback(
+        dash.dependencies.Output('div_selected_table', 'children'),
+        dash.dependencies.Input('datatable-interactivity', 'selected_rows'),
+        dash.dependencies.State('datatable-interactivity', 'data'), 
+        prevent_initial_call=True)
+    def print_value(selected_rows,rows):
+        con = sqlite3.connect(sqnce_path) # deploy with this
+        rows = pd.DataFrame.from_dict(rows)
+        #print(df)
+        #print(selected_rows)
+        rows = rows.iloc[selected_rows, :]
+        #print(df)
+        coordinate_list = rows[["CHROM", "POS"]].values
+        # Check the neighboring genes for each row in the input data
+        df = pd.DataFrame()
+        for row in coordinate_list:
+            df = pd.concat([df, get_SNP_neighbors("B73v4", str(row[0]), int(row[1]), 100000)])
+        # Since some genes can overlap, remove duplicated values and eep first
+        print(df.columns)
+        df = df.drop_duplicates(subset=["gene_id"]).reset_index()
+
+        # Add a column of gene annotations when available
+        df["annotation"] = annotation_select(con, df["gene_id"].to_list())
+        df = df.drop(["index", "genotype_id", "gene_orientation"], axis=1)
+
+
+        return dash_table.DataTable(
+                    id='selected_table',
+                    columns=[{"name": i, "id": i, "deletable": True, "selectable": True} for i in df.columns],
+                    data=df.to_dict('records'),
+                    editable=False,
+                    filter_action="native",
+                    sort_action="native",
+                    sort_mode="multi",
+                    column_selectable="single",
+                    row_selectable="multi",
+                    row_deletable=True,
+                    selected_columns=[],
+                    selected_rows=[],
+                    page_action="native",
+                    page_current= 0,
+                    page_size= 10,
+                )
+
+    # Query to find neighboring genes
+    def get_SNP_neighbors(genotype, chromsome, coordinate, distance):
+        con = sqlite3.connect(sqnce_path) # deploy with this
+        cursorObj = con.cursor()
+        df = pd.read_sql_query('''SELECT * 
+                        FROM gene_coordinates 
+                        WHERE genotype_id = "{0}"
+                        AND gene_chr = "{1}"
+                        AND gene_start BETWEEN {2} AND {3}
+                        
+                        UNION ALL
+                        
+                        SELECT * 
+                        FROM gene_coordinates 
+                        WHERE genotype_id = "{0}"
+                        AND gene_chr = "{1}"
+                        AND gene_end BETWEEN {2} AND {3}
+                        '''.format(genotype, chromsome, coordinate-distance, coordinate+distance), con)
+        # Should check why it returns the same row twice, probably need to correct the query
+        df = df.drop_duplicates()
+        df.insert(0, 'Query', pd.Series(["_".join([chromsome, str(coordinate)]) for x in range(len(df.index))]))
+        return(df)
+
+    def annotation_select(con, entity_list):
+        ls = []
+        for entity in entity_list:
+            cursorObj = con.cursor()
+            cursorObj.execute('''SELECT gene_id, gene_annotation 
+                                FROM gene_annotations 
+                                WHERE gene_id =  ?  ''', (entity,))
+            # (name,) - need the comma to treat it as a single item and not list of letters
+            selected = cursorObj.fetchall()
+            if selected == []:
+                ls.append("Gene not found")
+            else:
+                ls.append(selected[0][1])    
+        return(ls)

@@ -28,9 +28,12 @@ def register_callbacks(dashapp):
         cwd = os.getcwd() # for personal computer
     sqnce_path = os.path.join(cwd, "SQNce.db")
     
+    
+
     @dashapp.callback(Output('tab_content', 'children'),
                       Input('url', 'pathname'))
     def display_page_content(pathname):
+        #print(@app.context_processor)
         pathname = pathname.split("/")[-1]
         if pathname == "available_dbs":
             return tab_avaialble_dbs

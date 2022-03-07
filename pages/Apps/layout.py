@@ -13,7 +13,12 @@ layout = html.Div([
         #dbc.NavItem(dbc.NavbarBrand("PlantApp")),
         #dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
         
-        dbc.Button("About", id="about", outline=True, color="light", className="m-1", external_link=True, href="/about"),
+        dbc.DropdownMenu(
+            [dbc.DropdownMenuItem("About", id="home_about", external_link=True, href="/about"),
+            dbc.DropdownMenuItem("Login", id="home_login", external_link=True, href="/login"),
+            ], label="Home", color="secondary", className="m-1",
+            toggle_style={"background": "transparent","border-color": "#f8f9fa"},
+        ),
         dbc.DropdownMenu(
             [dbc.DropdownMenuItem("Available DBs", id="available_dbs", external_link=True, href="/SQNce/available_dbs"), 
             dbc.DropdownMenuItem(divider=True),
@@ -37,15 +42,18 @@ layout = html.Div([
             dbc.DropdownMenuItem("Gene Expression", id="expression", external_link=True, href="/SQNce/transcriptomics"),
             dbc.DropdownMenuItem("Transcriptomic Meta-data", disabled=True),
             dbc.DropdownMenuItem("Omics", id="omics", external_link=True, href="/SQNce/omics"),
-            ], label="Apps", color="secondary", className="m-1",
+            ], label="SQNce", color="primary", className="m-1",
             toggle_style={"background": "transparent","border-color": "#f8f9fa"},
+
         ),
         dbc.DropdownMenu(
             [dbc.DropdownMenuItem("Simple Tree", id="simple_tree", external_link=True, href="/apps/simple_tree"),
             dbc.DropdownMenuItem("Genome Graph", id="genome_graph", external_link=True, href="/apps/genome_graph"),
             dbc.DropdownMenuItem("GO Enrichment", id="go_enrichment", disabled=True),
-            ], label="SQNce", color="primary", className="m-1",
+            dbc.DropdownMenuItem("Mapping Summary", id="mapping_summary", external_link=True, href="/apps/mapping_summary"),
+            ], label="Apps", color="primary", className="m-1",
         ),
+        
         dbc.Button("Downloads", id="downloads", outline=True, color="secondary", 
                     className="m-1", disabled=True),
         dbc.Button("Feedback", id="feedback", outline=True, color="secondary", 
