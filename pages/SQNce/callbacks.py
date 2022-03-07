@@ -39,6 +39,8 @@ def register_callbacks(dashapp):
             return tab_avaialble_dbs
         elif pathname == "annotations":
             return tab_annotation_content
+        elif pathname == "symbols":
+            return tab_symbols_content
         elif pathname == "families_familyIDs":
             return tab_family_familyIDs_content
         elif pathname == "families_geneIDs":
@@ -363,6 +365,63 @@ def register_callbacks(dashapp):
             return(html.P("Something did not work reading the gene list"))
         try:
             output_df = pd.DataFrame({"GeneID": gene_list, "annotation": annotation_select(con, gene_list) })
+            output_df.columns = ["GeneID", "annotation"]
+            return dash_table.DataTable(
+                columns=[{"name": i, "id": i} for i in output_df.columns],
+                data=output_df.to_dict('records'),
+                style_cell={'textAlign': 'left',
+                            'overflow': 'hidden',
+                            'textOverflow': 'ellipsis',
+                            'maxWidth': 0,},
+                editable=True,
+                row_deletable=True,)
+        except:
+            return(html.P("Something did not work returning the table"))
+
+    ###############################################################################
+    #                                Symbols
+    ###############################################################################
+
+    tab_symbols_content = html.Div([
+        dcc.Textarea(
+            id='symbols_gene_list',
+            value='Textarea content initialized\nwith multiple lines of text',
+            style={'width': '100%', 'height': 100},
+            ),
+
+        html.Div(id="symbols_table"),
+        ])
+
+    def symbol_select(con, entity_list):
+        ls = []
+        for entity in entity_list:
+            cursorObj = con.cursor()
+            cursorObj.execute('''SELECT gene_id, gene_symbol 
+                                FROM gene_symbols 
+                                WHERE gene_id =  ?  ''', (entity,))
+            # (name,) - need the comma to treat it as a single item and not list of letters
+            selected = cursorObj.fetchall()
+            if selected == []:
+                ls.append("")
+            else:
+                ls.append(selected[0][1])    
+        return(ls)
+
+    @dashapp.callback(
+        Output('symbols_table', 'children'),
+        Input('symbols_gene_list', 'value'))
+    def get_gene_list(value):
+        con = sqlite3.connect(sqnce_path) # deploy with this
+        try:
+            gene_list = value.split("\n")
+            if len(gene_list) > 500:
+                gene_list = gene_list[:500]
+            if gene_list[-1]=="":
+                gene_list = gene_list[:-1]
+        except:
+            return(html.P("Something did not work reading the gene list"))
+        try:
+            output_df = pd.DataFrame({"GeneID": gene_list, "annotation": symbol_select(con, gene_list) })
             output_df.columns = ["GeneID", "annotation"]
             return dash_table.DataTable(
                 columns=[{"name": i, "id": i} for i in output_df.columns],

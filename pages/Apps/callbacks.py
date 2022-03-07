@@ -536,6 +536,7 @@ def register_callbacks(dashapp):
 
         # Add a column of gene annotations when available
         df["annotation"] = annotation_select(con, df["gene_id"].to_list())
+        df["symbols"] = symbol_select(con, df["gene_id"].to_list())
         df = df.drop(["index", "genotype_id", "gene_orientation"], axis=1)
 
 
@@ -591,6 +592,21 @@ def register_callbacks(dashapp):
             selected = cursorObj.fetchall()
             if selected == []:
                 ls.append("Gene not found")
+            else:
+                ls.append(selected[0][1])    
+        return(ls)
+
+    def symbol_select(con, entity_list):
+        ls = []
+        for entity in entity_list:
+            cursorObj = con.cursor()
+            cursorObj.execute('''SELECT gene_id, gene_symbol 
+                                FROM gene_symbols 
+                                WHERE gene_id =  ?  ''', (entity,))
+            # (name,) - need the comma to treat it as a single item and not list of letters
+            selected = cursorObj.fetchall()
+            if selected == []:
+                ls.append("")
             else:
                 ls.append(selected[0][1])    
         return(ls)

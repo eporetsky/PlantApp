@@ -24,7 +24,7 @@ layout = html.Div([
             dbc.DropdownMenuItem(divider=True),
             dbc.DropdownMenuItem("Gene Descriptions", header=True),
             dbc.DropdownMenuItem("Annotations", id="annotations", external_link=True, href="/SQNce/annotations"),
-            dbc.DropdownMenuItem("Gene Symbols", id="symbols", disabled=True),
+            dbc.DropdownMenuItem("Gene Symbols", id="symbols", external_link=True, href="/SQNce/symbols"),
             dbc.DropdownMenuItem("Get Genes from Family Names", id="families_familyIDs", external_link=True, href="/SQNce/families_familyIDs"),
             dbc.DropdownMenuItem("Get Family Names of Genes", id="families_geneIDs", external_link=True, href="/SQNce/families_geneIDs"),
             dbc.DropdownMenuItem(divider=True),
@@ -44,7 +44,6 @@ layout = html.Div([
             dbc.DropdownMenuItem("Omics", id="omics", external_link=True, href="/SQNce/omics"),
             ], label="SQNce", color="primary", className="m-1",
             toggle_style={"background": "transparent","border-color": "#f8f9fa"},
-
         ),
         dbc.DropdownMenu(
             [dbc.DropdownMenuItem("Simple Tree", id="simple_tree", external_link=True, href="/apps/simple_tree"),
