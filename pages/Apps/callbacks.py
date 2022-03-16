@@ -1,3 +1,6 @@
+from numpy import Inf
+
+
 def register_callbacks(dashapp):
     import pandas as pd
     from collections import OrderedDict
@@ -18,8 +21,6 @@ def register_callbacks(dashapp):
     import base64
     import io
 
-
-
     from collections import OrderedDict
 
     import dash
@@ -27,12 +28,16 @@ def register_callbacks(dashapp):
     from flask import Flask, send_from_directory
     from urllib.parse import quote as urlquote
 
-    from io import StringIO
+    from io import BytesIO
+    from PIL import Image
+
     from Bio import SeqIO
     from Bio import Phylo
     from Bio import AlignIO
     from Bio.SeqRecord import SeqRecord
     from Bio.Seq import Seq
+    from PIL import Image
+
 
     # import numpy as np
     from io import BytesIO
@@ -43,6 +48,7 @@ def register_callbacks(dashapp):
 
     # import pandas as pd
     from plotly.tools import mpl_to_plotly
+    import plotly.express as px
     import matplotlib
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
@@ -375,84 +381,34 @@ def register_callbacks(dashapp):
         return "data:image/png;base64,{}".format(encoded)
 
     ###############################################################################
-    #                                Mapping Summary
+    #                                Helper Functions
     ###############################################################################
-    
-    tab_mapping_summary = html.Div([
-        html.Br(),
-        html.Div([
-            dbc.Row([
-                dbc.RadioItems(
-                    id="mapping_summary_select_menu",
-                    className="btn-group",
-                    inputClassName="btn-check",
-                    labelClassName="btn btn-outline-primary",
-                    labelCheckedClassName="active",
-                    options=[
-                        {"label": "Summarize Mapping Data", "value": 1},
-                        {"label": "Public Mapping Data", "value": 2},
-                        {"label": "User Mapping Data", "value": 3},
-                    ], value=1,
-                    ),
-                ], align="end",
-                ),
-        ], style={"height": "50px"},
-        ),
-        
-        html.Div(id="mapping_summary_select_menu_output")
-        
-    ]),
+    def distinct_db_vals(db, table, column, custom_vals=[], return_ls=False):
+        # Input is the column to select and from which table
+        # Returns a list of all values in a specific table from SQNce.db
+        # Custom vals are added to the front using nested list of [label, value]
+        # Use return_ls for clean list of distinct values, not for dropdown menu
+        ls = [{ 'label': label, 'value': val} for label, val in custom_vals]
+        con = sqlite3.connect(db) # deploy with this
+        cursorObj = con.cursor()
+        distinct_df = pd.read_sql_query('''SELECT DISTINCT {0} 
+                                        FROM {1}'''.format(column, table), con)
+        if return_ls:
+            return(distinct_df[column].to_list())
+        for name in distinct_df[column]:
+            ls.append({'label': name, 'value': name})
+        return(ls)
 
-    tab_mapping_summary_public = html.Div([
-        html.P("This is the public tab.")
-    ]),
-
-    tab_mapping_summary_user = html.Div([
-        html.P("This is the user tab.")
-    ]),
-
-    tab_mapping_summary_upload = html.Div([
-        html.P("This is the upload tab."),
-        dcc.Upload(
-            id='upload-image',
-            children=html.Div([
-                'Drag and Drop or ',
-                html.A('Select Files')
-            ]),
-            style={
-                'width': '100%',
-                'height': '60px',
-                'lineHeight': '60px',
-                'borderWidth': '1px',
-                'borderStyle': 'dashed',
-                'borderRadius': '5px',
-                'textAlign': 'center',
-                'margin': '10px'
-            },
-            # Allow multiple files to be uploaded
-            multiple=True
-        ),
-        html.Div(id='output-image-upload'),
-        html.Div(id='div_selected_table', style = {'max-width': '1200px'}),
-    ]),
-
-    tab_mapping_login_request = html.Div([
-        html.P("Please login for access.")
-    ])
-    
-    @dashapp.callback(Output("mapping_summary_select_menu_output", "children"), 
-                  Input("mapping_summary_select_menu", "value"))
-    def mapping_summary_display_page(value):
-        if value == 1:
-            return(tab_mapping_summary_upload)
-        if value == 2:
-            return(tab_mapping_summary_public)
-        if session.get('username', None)==None:
-            return(tab_mapping_login_request)
-        #print(session.get('username', None))
-        
-        if value == 3:
-            return(tab_mapping_summary_user)
+    def return_column_if(db, table, return_column, check_column, condition, custom_vals=[]):
+        ls = [{ 'label': label, 'value': val} for label, val in custom_vals]
+        con = sqlite3.connect(db) # deploy with this
+        cursorObj = con.cursor()
+        distinct_df = pd.read_sql_query('''SELECT {0} 
+                                        FROM {1}
+                                        WHERE {2}=="{3}"'''.format(return_column, table, check_column, condition), con)
+        for name in distinct_df[return_column]:
+            ls.append({'label': name, 'value': name})
+        return(ls)
 
     def parse_contents(contents, filename, date):
         if filename.split(".")[-1] in ["png", "jpg", "jpeg"]:
@@ -500,8 +456,78 @@ def register_callbacks(dashapp):
 
             ], style = {'max-width': '1200px'})
 
+    ###############################################################################
+    #                                Mapping Summary
+    ###############################################################################
+    
+    tab_mapping_summary = html.Div([
+        html.Br(),
+        html.Div([
+            dbc.Row([
+                dbc.RadioItems(
+                    id="mapping_summary_select_menu",
+                    className="btn-group",
+                    inputClassName="btn-check",
+                    labelClassName="btn btn-outline-primary",
+                    labelCheckedClassName="active",
+                    options=[
+                        {"label": "Upload Data", "value": 1},
+                        {"label": "Manage Data", "value": 2},
+                        {"label": "Annotate Results", "value": 3},
+                        {"label": "View Results", "value": 4},
+                    ], value=4,
+                    ),
+                ], align="end",
+                ),
+        ], style={"height": "50px"},
+        ),
+        
+        html.Div(id="mapping_summary_select_menu_output")
+    ])
+
+    @dashapp.callback(Output("mapping_summary_select_menu_output", "children"), 
+                      Input("mapping_summary_select_menu", "value"))
+    def mapping_summary_display_page(value):
+        #print(value)
+        if value == 1:
+            return(tab_mapping_summary_upload)
+        if session.get('username', None)==None:
+            return(tab_mapping_login_request)
+        if value == 2:
+            return(tab_mapping_summary_manage)
+        if value == 3:
+            return(tab_mapping_summary_annotate)
+        #print(session.get('username', None))
+        if value == 4:
+            return(tab_mapping_summary_view)
+
+    tab_mapping_summary_upload = html.Div([
+        html.P("This is the upload tab."),
+        dcc.Upload(
+            id='upload-image',
+            children=html.Div([
+                'Drag and Drop or ',
+                html.A('Select Files')
+            ]),
+            style={
+                'width': '100%',
+                'height': '60px',
+                'lineHeight': '60px',
+                'borderWidth': '1px',
+                'borderStyle': 'dashed',
+                'borderRadius': '5px',
+                'textAlign': 'center',
+                'margin': '10px'
+            },
+            # Allow multiple files to be uploaded
+            multiple=True
+        ),
+        html.Div(id='output_image_upload'),
+        html.Div(id='div_selected_table', style = {'max-width': '1200px'}),
+    ])
+
     @dashapp.callback(
-              Output('output-image-upload', 'children'),
+              Output('output_image_upload', 'children'),
              #Output('div_selected_table', 'children'),
               Input('upload-image', 'contents'),
               State('upload-image', 'filename'),
@@ -514,9 +540,9 @@ def register_callbacks(dashapp):
             return children
 
     @dashapp.callback(
-        dash.dependencies.Output('div_selected_table', 'children'),
-        dash.dependencies.Input('datatable-interactivity', 'selected_rows'),
-        dash.dependencies.State('datatable-interactivity', 'data'), 
+        Output('div_selected_table', 'children'),
+        Input('datatable-interactivity', 'selected_rows'),
+        State('datatable-interactivity', 'data'), 
         prevent_initial_call=True)
     def print_value(selected_rows,rows):
         con = sqlite3.connect(sqnce_path) # deploy with this
@@ -531,18 +557,17 @@ def register_callbacks(dashapp):
         for row in coordinate_list:
             df = pd.concat([df, get_SNP_neighbors("B73v4", str(row[0]), int(row[1]), 100000)])
         # Since some genes can overlap, remove duplicated values and eep first
-        print(df.columns)
+        
         df = df.drop_duplicates(subset=["gene_id"]).reset_index()
 
         # Add a column of gene annotations when available
-        df["annotation"] = annotation_select(con, df["gene_id"].to_list())
-        df["symbols"] = symbol_select(con, df["gene_id"].to_list())
+        df["annotation"] = multiple_row_select(con, "gene_annotations", df["gene_id"].to_list())
         df = df.drop(["index", "genotype_id", "gene_orientation"], axis=1)
 
 
         return dash_table.DataTable(
                     id='selected_table',
-                    columns=[{"name": i, "id": i, "deletable": True, "selectable": True} for i in df.columns],
+                    columns=[{"name": i, "id": i, "deletable": False, "selectable": False} for i in df.columns],
                     data=df.to_dict('records'),
                     editable=False,
                     filter_action="native",
@@ -558,8 +583,497 @@ def register_callbacks(dashapp):
                     page_size= 10,
                 )
 
+    ###########################################################################
+    ###########################################################################
+    tab_mapping_login_request = html.Div([
+        html.P("Please login for access.")
+    ])
+
+    ###########################################################################
+    ###########################################################################
+    tab_mapping_summary_manage = html.Div([
+        html.P("This tab can be used to see how many experiments are available for the user."),
+        # Get a list of unique genotypes from the db
+        dcc.Dropdown(
+            id='coordinates_genotypes_dropdown',
+            options=distinct_db_vals(sqnce_path, "mapping_traits", "trait", [["All", "all"]]),
+            value="all"
+        ),
+        dcc.Dropdown(
+            id='coordinates_genotypes_dropdown',
+            options=[{'label': "All", 'value': "all"},
+                     {'label': "Not annotated", 'value': "unannotated"},
+                     {'label': "Ambiguous", 'value': "ambiguous"},
+                     {'label': "Annotated", 'value': 'annotated'}],
+            value="unannotated"
+        ),
+    ])
+
+    ###########################################################################
+    ###########################################################################
+
+    tab_mapping_summary_annotate = html.Div([
+        dcc.Store(id='store_plot_rowid_list'),
+        dcc.Store(id='store_current_plot_list_index'),
+        html.P("This tab will help access all the mapping candidates."),
+        html.Div(id="coordinates_genotypes_dropdown_div",
+                 style = {"width": "95%"}),
+        # Get a list of unique genotypes from the db
+        dcc.Dropdown(
+            id='mapping_experiments_dropdown',
+            options=distinct_db_vals(sqnce_path, "mapping_traits", "experiment",),
+                #[["All","all"], ["Complete","complete"],["Skipped","skipped"],["Unannotated","unannotated"]]),
+            value="Select Experiment Name",
+            style = {"width": "95%"},
+        ),
+        html.Div(id='div_mapping_experiments_dropdown', style = {"width": "95%"}), # 'max-width': '95%' 1200px
+        html.P(),
+        html.Div([dbc.ButtonGroup([
+            dbc.Button("Previous plot", id="parser_previous_plot", outline=False),
+            dbc.Button("Next plot", id="parser_skip_plot", outline=False),
+            dbc.Button("Accept results", id="parser_accept_results", outline=False, color="warning"),
+            ], size="lg", style={"width": "95%"}),
+        ], style = {"width": "95%"}),
+        html.P(),
+        html.Div([
+            dbc.ButtonGroup([
+                dbc.Button("Skip", id="score_skip", outline=True, color="primary"),
+                dbc.Button("1", id="score_1", outline=True, color="primary"),
+                dbc.Button("2", id="score_2", outline=True, color="primary"),
+                dbc.Button("3", id="score_3", outline=True, color="primary"),
+                dbc.Button("4", id="score_4", outline=True, color="primary"),
+                dbc.Button("5", id="score_5", outline=True, color="primary"),
+            ], size="lg", style={"width": "95%"}),
+        ], id="mapping_score_dropdown_div", style = {"width": "95%"}),
+        html.P(),
+        html.Div(id='div_mapping_summary_parser', style = {"width": "95%"}),
+        html.P(),
+        html.Div(id="mapping_parser_candidates_table", style = {"width": "95%"}),
+        html.Div(id='mapping_empty_placeholder', style = {"width": "95%"}),
+
+        # To start I can do a dropboxwith "all" and then groupby and count
+        # And otherwise sort by distinct symbols, gene IDs
+    ])
+
+    @dashapp.callback(
+        Output('div_mapping_experiments_dropdown', 'children'),
+        Input('mapping_experiments_dropdown', 'value'),
+        prevent_initial_call=True)
+    def coordinates_genotypes_dropdown_div(selected_experiments):
+        options = distinct_db_vals(sqnce_path, 'mapping_traits', 'processed', [["All", "all"]])
+        options += return_column_if(sqnce_path, 'mapping_traits', 'trait', 'experiment', selected_experiments)
+        return html.Div([dcc.Dropdown(
+            id='select_mapping_traits',
+            options=options,
+            value="all",
+            style = {"width": "95%"},)
+        ])
+
+    @dashapp.callback(
+        [Output('score_skip', 'outline'), Output('score_skip', 'color'),
+         Output('score_1', 'outline'), Output('score_1', 'color'),
+         Output('score_2', 'outline'), Output('score_2', 'color'),
+         Output('score_3', 'outline'), Output('score_3', 'color'),
+         Output('score_4', 'outline'), Output('score_4', 'color'),
+         Output('score_5', 'outline'), Output('score_5', 'color')],
+        [Input('score_skip', 'n_clicks'),
+        Input('score_1', 'n_clicks'),
+        Input('score_2', 'n_clicks'),
+        Input('score_3', 'n_clicks'),
+        Input('score_4', 'n_clicks'),
+        Input('score_5', 'n_clicks'),
+        Input('store_plot_rowid_list', 'data'),
+        Input('store_current_plot_list_index', 'data')],
+        prevent_initial_call=True)
+    def mapping_score_dropdown_div(skip,s1,s2,s3,s4,s5,rowid_list,current_rowid):
+        # I store the score values as 0,1,2,3,4,5 for simplicity
+        con = sqlite3.connect(sqnce_path)
+        if rowid_list != None:
+            rowid = rowid_list[current_rowid]
+        cursorObj = con.cursor()
+        context = [p["prop_id"] for p in dash.callback_context.triggered][0]
+        #print("context:",context, current_rowid)
+        default = [True,"primary"]*6
+        if context == "score_skip.n_clicks":
+            default[0], default[1] = False, "success"
+            cursorObj.execute("UPDATE mapping_traits SET score=0 WHERE ROWID={0}".format(rowid))
+        if context == "score_1.n_clicks":
+            default[2], default[3] = False, "success"
+            cursorObj.execute("UPDATE mapping_traits SET score=1 WHERE ROWID={0}".format(rowid))
+        if context == "score_2.n_clicks":
+            default[4], default[5] = False, "success"
+            cursorObj.execute("UPDATE mapping_traits SET score=2 WHERE ROWID={0}".format(rowid))
+        if context == "score_3.n_clicks":
+            default[6], default[7] = False, "success"
+            cursorObj.execute("UPDATE mapping_traits SET score=3 WHERE ROWID={0}".format(rowid))
+        if context == "score_4.n_clicks":
+            default[8], default[9] = False, "success"
+            cursorObj.execute("UPDATE mapping_traits SET score=4 WHERE ROWID={0}".format(rowid))
+        if context == "score_5.n_clicks":
+            default[10], default[11] = False, "success"
+            cursorObj.execute("UPDATE mapping_traits SET score=5 WHERE ROWID={0}".format(rowid))
+        if context == "store_current_plot_list_index.data" or context == "store_plot_rowid_list.data":
+            df = pd.read_sql_query('''SELECT score 
+                FROM mapping_traits
+                WHERE rowid={0}'''.format(rowid), con)
+            #print(df.values.tolist())
+            df_val = df.values.tolist()[0][0]
+            #print("val:", df_val)
+            if df_val == None: None
+            else: default[df_val*2], default[df_val*2+1] = False, "success"
+        con.commit()
+        con.close()
+        return(default)
+
+        
+   
+    @dashapp.callback(
+        [Output('store_plot_rowid_list', 'data'),
+        Output('store_current_plot_list_index', 'data')],
+        [Input('select_mapping_traits', 'value'),
+        Input('parser_previous_plot', 'n_clicks'),
+        Input('parser_skip_plot', 'n_clicks'),
+        Input('parser_accept_results', 'n_clicks'),],
+        [State('store_plot_rowid_list', 'data'),
+        State('store_current_plot_list_index', 'data',)],
+        prevent_initial_call=True)
+    def store_plot_rowid_list(selected_traits, previous, skip, submit, rowid_list, current_index):
+        context = [p["prop_id"] for p in dash.callback_context.triggered][0]
+        if rowid_list != None:
+            rowid = rowid_list[current_index]
+
+        con = sqlite3.connect(sqnce_path)
+        
+        if context == "parser_previous_plot.n_clicks":
+            if current_index == 0:
+                return(dash.no_update, dash.no_update)
+            else:
+                return(dash.no_update, current_index-1)
+        if context == "parser_skip_plot.n_clicks":
+            cursorObj = con.cursor()
+            cursorObj.execute('UPDATE mapping_traits SET processed="Skipped" WHERE ROWID={0}'.format(rowid))
+            con.commit()
+            if current_index==len(rowid_list)-1:
+                return(dash.no_update, dash.no_update)
+            else:
+                return(dash.no_update, current_index+1)
+        if context == "parser_accept_results.n_clicks":
+            del rowid_list[current_index]
+            return(rowid_list, current_index)
+
+        
+        if selected_traits == "all":
+            df = pd.read_sql_query('''SELECT rowid 
+                FROM mapping_traits''', con)
+        elif selected_traits == "Unannotated":
+            df = pd.read_sql_query('''SELECT rowid 
+                FROM mapping_traits
+                WHERE processed="Unannotated"''', con) # IS NULL
+        elif selected_traits == "Complete":
+            df = pd.read_sql_query('''SELECT rowid 
+                FROM mapping_traits
+                WHERE processed="Complete"''', con)
+        elif selected_traits == "Skipped":
+            df = pd.read_sql_query('''SELECT rowid 
+                FROM mapping_traits
+                WHERE processed="Skipped"''', con)
+        else:
+            df = pd.read_sql_query('''SELECT rowid 
+                FROM mapping_traits
+                WHERE trait="{0}"'''.format(selected_traits), con)
+        #print(df["rowid"].values.tolist())
+        return(df["rowid"].values.tolist(), 0)
+
+    def pil_to_b64(im, enc_format="png", **kwargs):
+        """
+        Converts a PIL Image into base64 string for HTML displaying
+        :param im: PIL Image object
+        :param enc_format: The image format for displaying. If saved the image will have that extension.
+        :return: base64 encoding
+        """
+        buff = BytesIO()
+        im.save(buff, format=enc_format, **kwargs)
+        encoded = base64.b64encode(buff.getvalue()).decode("utf-8")
+
+        return encoded
+        
+
+    @dashapp.callback(
+        Output('div_mapping_summary_parser', 'children'),
+        [Input('store_plot_rowid_list', 'data'),
+        Input('store_current_plot_list_index', 'data')],
+        prevent_initial_call=True)
+    def mapping_parser_div(rowid_list, current_index):
+        # https://dash.gallery/dash-image-annotation/
+        
+        print(rowid_list,current_index)
+        if rowid_list != None:
+            rowid = rowid_list[current_index]
+
+        con = sqlite3.connect(sqnce_path)
+        cursorObj = con.cursor()
+
+        cursorObj.execute("""SELECT plot, trait
+                            FROM mapping_traits
+                            WHERE rowid= ? """, (rowid,))
+        fig, trait = cursorObj.fetchall()[0]
+        
+        df = pd.read_sql_query('''SELECT * 
+                                  FROM mapping_results
+                                  WHERE trait = "{0}"'''.format(trait), con)
+        df = df.sort_values(df.columns[-1])
+        df = df.drop_duplicates()
+
+        picture_stream = io.BytesIO(fig)
+        picture = Image.open(picture_stream)
+
+        image_annotation_card = dbc.Row([
+            dbc.Col([html.Img(className="image", src="data:image/png;base64, " + pil_to_b64(picture))],
+                width={"size": 4, "offset": 0}),
+            dbc.Col([dash_table.DataTable(
+                id='mapping_parser_results_table',
+                columns=[{"name": i, "id": i, "deletable": False, "selectable": False} for i in df.columns],
+                data=df.to_dict('records'),
+                editable=False,
+                #filter_action="native",
+                sort_action="native",
+                sort_mode="multi",
+                #column_selectable="single",
+                row_selectable="multi",
+                row_deletable=False,
+                #selected_columns=[],
+                selected_rows=[0],
+                page_action="native",
+                page_current= 0,
+                page_size= 10,
+                hidden_columns=["experiment", "trait", "ref", "alt"],
+                css=[{"selector": ".show-hide", "rule": "display: none"}], # removes "Toggle Columns" button
+
+            )], width={"size": 6, "offset": 2, "order": "last"}),
+        ]),
+        return(image_annotation_card)
+
+    @dashapp.callback(
+        Output('mapping_parser_candidates_table', 'children'),
+        Input('mapping_parser_results_table', 'selected_rows'),
+        State('mapping_parser_results_table', 'data'), 
+        prevent_initial_call=True)
+    def mapping_parser_candidates_table(selected_rows,rows):
+        empty_dash_table = dash_table.DataTable(
+                id='selected_candidate_table',
+                columns=[{"name": i, "id": i, "deletable": False, "selectable": False} for i in ["no neighboring genes found"]],
+            )
+        
+        print("SELECTED ROWS:", selected_rows)
+        if len(selected_rows) == 0:
+            print("TEST TEST TEST")
+            return empty_dash_table
+        con = sqlite3.connect(sqnce_path)
+        rows = pd.DataFrame.from_dict(rows)
+        rows = rows.iloc[selected_rows, :]
+        coordinate_list = rows[["chrom", "pos", "pval", "trait", "experiment", "effect", "snp"]].values
+        df = pd.DataFrame()
+        are_all_empty = True
+        for row in coordinate_list:
+            tmp_df = get_SNP_neighbors("B73v4", str(row[0]), int(row[1]), 100000)
+            if tmp_df.empty:
+                continue
+            are_all_empty = False
+
+            tmp_df.insert(0, "pval",row[2])
+            tmp_df.insert(0, "trait",row[3])
+            tmp_df.insert(0, "experiment",row[4])
+            tmp_df.insert(0, "effect",row[5])
+            tmp_df.insert(0, "snp",row[6])
+            df = pd.concat([df, tmp_df])
+        
+        if are_all_empty:
+            return empty_dash_table
+        df = df.drop_duplicates(subset=["gene_id"]).reset_index()
+
+
+        # Add a column of gene annotations when available
+        df["annotation"] = multiple_row_select(con, "gene_annotations", "gene_annotation", df["gene_id"].to_list())
+        df["symbols"] = multiple_row_select(con, "gene_symbols", "gene_symbol", df["gene_id"].to_list())
+        df = df.drop(["index", "genotype_id", "gene_orientation"], axis=1)
+        
+                # Re-order columns so it matches the SQL INSERT function
+        df = df[["gene_id","symbols","annotation","gene_start","gene_end","distance",
+                  "experiment","trait","snp","chrom","pos","pval","effect"]]
+        df = df.sort_values("distance")
+
+        return dash_table.DataTable(
+                    id='selected_candidate_table',
+                    columns=[{"name": i, "id": i, "deletable": False, "selectable": False} for i in df.columns],
+                    data=df.to_dict('records'),
+                    editable=False,
+                    #filter_action="native",
+                    sort_action="native",
+                    sort_mode="multi",
+                    #column_selectable="single",
+                    row_selectable="multi",
+                    row_deletable=False,
+                    #selected_columns=[],
+                    selected_rows=[],
+                    page_action="native",
+                    page_current= 0,
+                    page_size= 10,
+                    hidden_columns=["pval", "effect","query", "trait", "experiment","chrom","pos"], #"experiment", "trait",
+                    css=[{"selector": ".show-hide", "rule": "display: none"}], # removes "Toggle Columns" button 
+                )
+        
+    @dashapp.callback(
+        Output('mapping_empty_placeholder', 'children'),
+        Input('parser_accept_results', 'n_clicks'   ),
+        [State('selected_candidate_table', 'data'),
+        State('selected_candidate_table', 'selected_rows'),
+        State('store_plot_rowid_list', 'data'),
+        State('store_current_plot_list_index', 'data',)],
+        prevent_initial_call=True)
+    def mapping_parser_candidates_table(accept_rows, rows, selected_rows, rowid_list, current_index):
+        #if len(selected_rows) == 0:
+        #    return(html.P("No candidate genes were selected."))
+        rows = pd.DataFrame.from_dict(rows)
+        rows = rows.iloc[selected_rows, :]
+        
+        con = sqlite3.connect(sqnce_path)
+        rowid = rowid_list[current_index]
+        cursorObj = con.cursor()
+        # Can't use processed="processed"
+        cursorObj.execute('UPDATE mapping_traits SET processed="Complete" WHERE ROWID={0}'.format(rowid))
+        cursorObj.execute('UPDATE mapping_traits SET num_candidates={0} WHERE ROWID={1}'.format(len(rows), rowid))
+        con.commit()
+        #con.close()
+        
+        gene_list_output = []
+        for row in rows.values:
+            cursorObj = con.cursor()
+            cursorObj.execute('''SELECT *
+                FROM mapping_candidates
+                WHERE gene_id="{0}" AND trait="{1}"'''.format(row[0], row[7]))
+            selected = cursorObj.fetchall()
+            # Only add new candidate if gene/trait combination doesn't exist
+            if selected==[]:
+                gene_list_output.append(row[0])
+                cursorObj.execute("""INSERT INTO mapping_candidates(
+                         gene_id, 
+                         gene_symbol, 
+                         gene_annotation,
+                         gene_start,
+                         gene_end,
+                         distance,
+                         experiment,
+                         trait,
+                         snp,
+                         chrom,
+                         pos,
+                         pval,
+                         effect) 
+                         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""", row)
+                con.commit()
+        
+        return html.P("adding the following genes: "+", ".join(gene_list_output))
+    ###########################################################################
+    ###########################################################################
+    
+    tab_mapping_summary_view = html.Div([
+        dbc.Label("This tab will help access all the mapping candidates."),
+        # To start I can do a dropboxwith "all" and then groupby and count
+        # And otherwise sort by distinct symbols, gene IDs
+        html.P("Select which experiments to show:"),
+        dcc.Dropdown(
+            id='mapping_candidates_experiments_dropdown',
+            options=distinct_db_vals(sqnce_path, "mapping_candidates", "experiment",[["All","all"]]),
+                #[["All","all"], ["Complete","complete"],["Skipped","skipped"],["Unannotated","unannotated"]]),
+            value="all",
+            style = {"width": "95%"},
+        ),
+        dbc.Row([
+            dbc.Col([
+                dbc.Label("Select which scores to include (not implemented yet):"),
+                dbc.Checklist(options=[{"label": str(n), "value": n} for n in range(6)],
+                    value=[5], id="candidate_score_checklist", 
+                    inline=True, style = {"width": "95%"}
+                ),]),
+            dbc.Col([    
+                dbc.Label("Options for selected candidates"),
+                dbc.Checklist(
+                    options=[
+                        {"label": "Show manhattan plots?", "value": 1},
+                        {"label": "Show clustered traits?", "value": 2},
+                    ], id="switches-inline-input",
+                    value=[1,2], inline=True, switch=True,
+                ),]),
+        ]),
+        html.Div(id='div_mapping_candidates_traits_dropdown', style = {"width": "95%"}),
+        html.Div(id='div_mapping_candidates_selected_table', style = {"width": "95%"}),
+    
+
+    ])
+
+    @dashapp.callback(
+        Output('div_mapping_candidates_traits_dropdown', 'children'),
+        Input('mapping_candidates_experiments_dropdown', 'value'),
+        prevent_initial_call=True)
+    def coordinates_genotypes_dropdown_div(selected_experiments):
+        if selected_experiments == "all":
+            options = distinct_db_vals(sqnce_path, 'mapping_candidates',
+                "trait", [["All", "all"]])
+        else:
+            options = return_column_if(sqnce_path, 'mapping_candidates', 'trait',
+                "experiment", selected_experiments, [["All", "all"]])
+        return html.Div([dcc.Dropdown(
+            id='mapping_candidates_traits_dropdown',
+            options=options,
+            value="all",
+            multi=True,
+            searchable=True,
+            style = {"width": "95%"},)
+    ])
+
+    @dashapp.callback(
+        Output('div_mapping_candidates_selected_table', 'children'),
+        Input('mapping_candidates_traits_dropdown', 'value'),
+        prevent_initial_call=True)
+    def mapping_parser_candidates_table(selected_traits):
+        con = sqlite3.connect(sqnce_path)
+        print(selected_traits)
+        if "all" in selected_traits:
+            df = pd.read_sql_query('''SELECT * 
+                                      FROM mapping_candidates''', con)  
+        df["pval"] = df["pval"].apply(lambda x: np.round(-np.log10(x), 2))
+        df["rpos"] = df["pos"].apply(lambda x: round(x, -5)/100000)
+        df = df.drop_duplicates() # Just in case
+
+        return dash_table.DataTable(
+                    id='selected_candidate_table',
+                    columns=[{"name": i, "id": i, "deletable": False, "selectable": False} for i in df.columns],
+                    # https://dash.plotly.com/datatable/reference
+                    sort_by = [{"column_id": "chrom", "direction": "asc"},
+                                {"column_id": "pos", "direction": "asc"}],
+                    data=df.to_dict('records'),
+                    editable=False,
+                    #filter_action="native",
+                    sort_action="native",
+                    sort_mode="multi",
+                    #column_selectable="single",
+                    row_selectable="multi",
+                    row_deletable=False,
+                    #selected_columns=[],
+                    selected_rows=[],
+                    page_action="native",
+                    page_current= 0,
+                    page_size= 100,
+                    hidden_columns=["effect", "gene_end", "snp"], #"effect","query", "trait", "experiment","chrom","pos"], #"experiment", "trait",
+                    css=[{"selector": ".show-hide", "rule": "display: none"}], # removes "Toggle Columns" button 
+                )
+
+
+    ###########################################################################
+    ###########################################################################
+
     # Query to find neighboring genes
-    def get_SNP_neighbors(genotype, chromsome, coordinate, distance):
+    def get_SNP_neighbors(genotype, chromosome, coordinate, distance):
         con = sqlite3.connect(sqnce_path) # deploy with this
         cursorObj = con.cursor()
         df = pd.read_sql_query('''SELECT * 
@@ -575,34 +1089,33 @@ def register_callbacks(dashapp):
                         WHERE genotype_id = "{0}"
                         AND gene_chr = "{1}"
                         AND gene_end BETWEEN {2} AND {3}
-                        '''.format(genotype, chromsome, coordinate-distance, coordinate+distance), con)
+                        '''.format(genotype, chromosome, coordinate-distance, coordinate+distance), con)
         # Should check why it returns the same row twice, probably need to correct the query
+        if df.empty:
+            return df
         df = df.drop_duplicates()
-        df.insert(0, 'Query', pd.Series(["_".join([chromsome, str(coordinate)]) for x in range(len(df.index))]))
-        return(df)
-
-    def annotation_select(con, entity_list):
-        ls = []
-        for entity in entity_list:
-            cursorObj = con.cursor()
-            cursorObj.execute('''SELECT gene_id, gene_annotation 
-                                FROM gene_annotations 
-                                WHERE gene_id =  ?  ''', (entity,))
-            # (name,) - need the comma to treat it as a single item and not list of letters
-            selected = cursorObj.fetchall()
-            if selected == []:
-                ls.append("Gene not found")
+        # This might confusing giver the original SNP name doesn't necessarily match
+        # df.insert(0, 'Query', pd.Series(["_".join([chromsome, str(coordinate)]) for x in range(len(df.index))]))
+        df = df.drop("gene_chr", axis=1)
+        df.insert(0, 'chrom', pd.Series([chromosome for x in range(len(df.index))]))
+        df.insert(0, 'pos', pd.Series([coordinate for x in range(len(df.index))]))
+        def calculate_distance(row):
+            left = min([row["gene_start"], row["gene_end"]])
+            right = max([row["gene_start"], row["gene_end"]])
+            if left <= row["pos"] <= right:
+                return 0
             else:
-                ls.append(selected[0][1])    
-        return(ls)
+                return min([abs(left-row["pos"]), abs(row["pos"]-right)])
+        df["distance"] = df.apply(calculate_distance, axis=1)
+        return df
 
-    def symbol_select(con, entity_list):
+    def multiple_row_select(con, table, col_name, entity_list):
         ls = []
         for entity in entity_list:
             cursorObj = con.cursor()
-            cursorObj.execute('''SELECT gene_id, gene_symbol 
-                                FROM gene_symbols 
-                                WHERE gene_id =  ?  ''', (entity,))
+            cursorObj.execute('''SELECT gene_id, {1} 
+                                FROM {0}
+                                WHERE gene_id =  ?  '''.format(table, col_name), (entity,))
             # (name,) - need the comma to treat it as a single item and not list of letters
             selected = cursorObj.fetchall()
             if selected == []:
@@ -610,3 +1123,5 @@ def register_callbacks(dashapp):
             else:
                 ls.append(selected[0][1])    
         return(ls)
+
+   
