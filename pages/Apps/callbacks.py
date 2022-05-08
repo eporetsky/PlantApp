@@ -13,6 +13,8 @@ def register_callbacks(dashapp):
     import sqlite3
     import numpy as np
     import plotly.graph_objs as go
+    from scipy.stats import  hypergeom
+    from statsmodels.stats.multitest import multipletests
 
     import os
     import zlib
@@ -69,9 +71,32 @@ def register_callbacks(dashapp):
             return tab_simple_tree
         if pathname == "genome_graph":
             return tab_genome_graph
+        if pathname == "go_enrichment":
+            return tab_go_enrichment
         if pathname == "mapping_summary":
             return tab_mapping_summary
 
+    ###############################################################################
+    #                                Helper Functions
+    ###############################################################################
+    def distinct_db_vals(db, table, column, custom_vals=[], return_ls=False):
+        # Input is the column to select and from which table
+        # Returns a list of all values in a specific table from SQNce.db
+        # Custom vals are added to the front using nested list of [label, value]
+        # Use return_ls for clean list of distinct values, not for dropdown menu
+        try:
+            ls = [{ 'label': label, 'value': val} for label, val in custom_vals]
+            con = sqlite3.connect(db) # deploy with this
+            cursorObj = con.cursor()
+            distinct_df = pd.read_sql_query('''SELECT DISTINCT {0} 
+                                            FROM {1}'''.format(column, table), con)
+            if return_ls:
+                return(distinct_df[column].to_list())
+            for name in distinct_df[column]:
+                ls.append({'label': name, 'value': name})
+            return(ls)
+        except:
+            return(None)
 
 
     ###############################################################################
@@ -215,9 +240,6 @@ def register_callbacks(dashapp):
             range_list.append(len(alignment))
         return range_list
 
-    
-
-
     ###############################################################################
     #                                Genome Graph
     ###############################################################################
@@ -248,10 +270,10 @@ def register_callbacks(dashapp):
         con = sqlite3.connect(sqnce_path) # deploy with this
         cursorObj = con.cursor()
         df = pd.read_sql_query('''SELECT * 
-                        FROM gene_coordinates 
-                        WHERE genotype_id = "{0}"
-                        AND gene_id = "{1}"
-                        '''.format(genotype, gene_id), con)
+                                FROM gene_coordinates 
+                                WHERE genome_id = "{0}"
+                                AND gene_id = "{1}"
+                                '''.format(genotype, gene_id), con)
         return(df)
 
     @dashapp.callback(
@@ -279,7 +301,7 @@ def register_callbacks(dashapp):
             for gene in gene_list:
                 coords = pd.concat([coords, get_gene_coordinates(genotype, gene)])
         except:
-            return(html.P("Something did not work writing the fasta file"))
+            return(html.P("Something did not work writing the fasta file"))       
         ctx = dash.callback_context
         if (not ctx.triggered and not ctx.triggered[0]['value'] == 0):
             return (no_update)
@@ -380,24 +402,6 @@ def register_callbacks(dashapp):
         encoded = base64.b64encode(out_img.read()).decode("ascii").replace("\n", "")
         return "data:image/png;base64,{}".format(encoded)
 
-    ###############################################################################
-    #                                Helper Functions
-    ###############################################################################
-    def distinct_db_vals(db, table, column, custom_vals=[], return_ls=False):
-        # Input is the column to select and from which table
-        # Returns a list of all values in a specific table from SQNce.db
-        # Custom vals are added to the front using nested list of [label, value]
-        # Use return_ls for clean list of distinct values, not for dropdown menu
-        ls = [{ 'label': label, 'value': val} for label, val in custom_vals]
-        con = sqlite3.connect(db) # deploy with this
-        cursorObj = con.cursor()
-        distinct_df = pd.read_sql_query('''SELECT DISTINCT {0} 
-                                        FROM {1}'''.format(column, table), con)
-        if return_ls:
-            return(distinct_df[column].to_list())
-        for name in distinct_df[column]:
-            ls.append({'label': name, 'value': name})
-        return(ls)
 
     def return_column_if(db, table, return_column, check_column, condition, custom_vals=[]):
         ls = [{ 'label': label, 'value': val} for label, val in custom_vals]
@@ -455,6 +459,117 @@ def register_callbacks(dashapp):
                 ),
 
             ], style = {'max-width': '1200px'})
+
+    ###############################################################################
+    #                                GO Enrichment
+    ###############################################################################
+
+    tab_go_enrichment = html.Div([
+        html.Br(),
+        dcc.Textarea(
+            id='go_enrichment_gene_list',
+            value='Textarea content initialized\nwith multiple lines of text',
+            style={'width': '100%', 'height': 100},
+        ),
+        dcc.Dropdown(
+            id='go_enrichment_obo_dropdown',
+            options=[{'label': 'GO-basic', 'value': 'GO-basic'}],
+            value="GO-basic"
+        ),
+        dcc.Dropdown(
+            id='go_enrichment_genomes_dropdown',
+            options=distinct_db_vals(sqnce_path, "genomes", "genome_id", 
+                                     [["None", "None"]]),
+            value="None"
+        ),
+        dcc.Dropdown(
+            id='go_enrichment_adjustment',
+            options=[{'label': 'FDR', 'value': 'FDR'}],
+            value="FDR"
+        ),
+        html.Div(id="go_enrichment_table"),
+        ])
+
+    @dashapp.callback(
+        Output('go_enrichment_table', 'children'),
+        Input('go_enrichment_gene_list', 'value'),
+        Input('go_enrichment_genomes_dropdown', 'value'))
+    def go_enrichment_(value, genome):
+        con = sqlite3.connect(sqnce_path) # deploy with this
+        def hyper_geom(row):
+            hpd = hypergeom(row[2], row[1], row[3])
+            p = hpd.pmf(row[0])
+            return(p)
+
+        try:
+            gene_list = value.split("\n")
+            if len(gene_list) > 1000:
+                gene_list = gene_list[:1000]
+            if gene_list[-1]=="":
+                gene_list = gene_list[:-1]
+        except:
+            return(html.P("Something did not work reading the gene list"))
+        try:
+            cursorObj = con.cursor()
+            cursorObj.execute('''SELECT gene_number 
+                                FROM genomes
+                                WHERE genome_id =  ?  ''', (genome,))
+            # (name,) - need the comma to treat it as a single item and not list of letters
+            selected = cursorObj.fetchall()
+            print(genome, selected)
+            genome_count = selected[0][0]
+            ls = []
+            for entity in gene_list:
+                cursorObj = con.cursor()
+                cursorObj.execute('''SELECT gene_id, GO_id, GO_count 
+                                    FROM gene_GOs 
+                                    WHERE gene_id =  ?  ''', (entity,))
+                # (name,) - need the comma to treat it as a single item and not list of letters
+                selected = cursorObj.fetchall()
+                if selected == []:
+                    continue
+                else:
+                    ls.append(selected[0])
+            GO_df = pd.DataFrame(ls, columns=["gene_id", "GO_id", "GO_count"])
+            GO_counts = GO_df.groupby("GO_id").mean()["GO_count"]
+            GO_df = GO_df.groupby("GO_id").count()
+            GO_df["GO_count"] = GO_counts
+            GO_df["genome_count"] = genome_count
+            GO_df["group_count"] = len(gene_list)
+            GO_df["pval"] = GO_df.apply(hyper_geom, axis=1)
+            GO_df["adj"] = list(multipletests(GO_df["pval"].values.tolist(), method="fdr_bh")[1])
+            GO_df["FC_enrichment"] = (GO_df["gene_id"] / GO_df["GO_count"]) / (GO_df["group_count"] / GO_df["genome_count"])
+            
+            print(GO_df)
+            
+            ls1 = []
+            for entity in GO_df.index:
+                cursorObj = con.cursor()
+                cursorObj.execute('''SELECT process, GO_short, GO_long 
+                                    FROM GO_basic
+                                    WHERE GO_id =  ?  ''', (entity,))
+                # (name,) - need the comma to treat it as a single item and not list of letters
+                selected = cursorObj.fetchall()
+                if selected == []:
+                    continue
+                else:
+                    ls1.append(selected[0])
+            GO_basic = pd.DataFrame(ls1, columns=["process", "GO_short", "GO_long"])
+            GO_df = GO_df.reset_index()
+            output_df = pd.concat([GO_df, GO_basic], axis=1)
+            return dash_table.DataTable(
+                columns=[{"name": i, "id": i} for i in output_df.columns],
+                data=output_df.to_dict('records'),
+                style_cell={'textAlign': 'left',
+                            'overflow': 'hidden',
+                            'textOverflow': 'ellipsis',
+                            'maxWidth': 0,},
+                editable=False,
+                row_deletable=True,)
+
+        except:
+            return(html.P("Something did not work returning the table"))
+    
 
     ###############################################################################
     #                                Mapping Summary
@@ -565,7 +680,7 @@ def register_callbacks(dashapp):
 
         # Add a column of gene annotations when available
         df["annotation"] = multiple_row_select(con, "gene_annotations", df["gene_id"].to_list())
-        df = df.drop(["index", "genotype_id", "gene_orientation"], axis=1)
+        df = df.drop(["index", "genome_id", "gene_orientation"], axis=1)
 
 
         return dash_table.DataTable(
@@ -906,7 +1021,7 @@ def register_callbacks(dashapp):
         # Add a column of gene annotations when available
         df["annotation"] = multiple_row_select(con, "gene_annotations", "gene_annotation", df["gene_id"].to_list())
         df["symbols"] = multiple_row_select(con, "gene_symbols", "gene_symbol", df["gene_id"].to_list())
-        df = df.drop(["index", "genotype_id", "gene_orientation"], axis=1)
+        df = df.drop(["index", "genome_id", "gene_orientation"], axis=1)
         
                 # Re-order columns so it matches the SQL INSERT function
         df = df[["gene_id","symbols","annotation","gene_start","gene_end","distance",
@@ -1170,7 +1285,7 @@ def register_callbacks(dashapp):
                     id="update_mapping_candidates_experiments_dropdown"), width=2, align="center"),
         ], justify="start"),
         html.P(),
-        html.Div(id='div_mapping_candidates_experiments_dropdown', style = {"width": "95%"}),
+        html.Div(id='div_mapping_candidates_single_experiments_dropdown', style = {"width": "95%"}),
         
         html.Div(id='div_mapping_candidates_single_traits_dropdown', style = {"width": "95%"}),
 
@@ -1200,7 +1315,7 @@ def register_callbacks(dashapp):
 
     @dashapp.callback(
         Output('div_mapping_candidates_single_traits_dropdown', 'children'),
-        Input('mapping_candidates_experiments_dropdown', 'value'),
+        Input('div_mapping_candidates_single_experiments_dropdown', 'value'),
         prevent_initial_call=True)
     def coordinates_genotypes_dropdown_div(selected_experiments):
         if "all" in selected_experiments:
@@ -1223,6 +1338,61 @@ def register_callbacks(dashapp):
             style = {"width": "95%"},)
     ])
 
+    @dashapp.callback(
+        Output('div_mapping_summary_info', 'children'),
+        [Input('div_mapping_candidates_single_traits_dropdown', 'data'),
+        State('div_mapping_candidates_single_experiments_dropdown', 'data')],
+        prevent_initial_call=True)
+    def mapping_parser_div(rowid_list, current_index):
+        # https://dash.gallery/dash-image-annotation/
+        
+        for row in rows.values:
+            cursorObj = con.cursor()
+            cursorObj.execute('''SELECT *
+                FROM mapping_candidates
+                WHERE gene_id="{0}" AND trait="{1}"'''.format(row[0], row[7]))
+            selected = cursorObj.fetchall()
+
+        cursorObj.execute("""SELECT plot, trait
+                            FROM mapping_traits
+                            WHERE rowid= ? """, (rowid,))
+        fig, trait = cursorObj.fetchall()[0]
+        
+        df = pd.read_sql_query('''SELECT * 
+                                  FROM mapping_results
+                                  WHERE trait = "{0}"'''.format(trait), con)
+        df = df.sort_values(df.columns[-1])
+        df = df.drop_duplicates()
+
+        picture_stream = io.BytesIO(fig)
+        picture = Image.open(picture_stream)
+
+        image_annotation_card = dbc.Row([
+            dbc.Col([html.Img(className="image", src="data:image/png;base64, " + pil_to_b64(picture))],
+                width={"size": 4, "offset": 0}),
+            dbc.Col([dash_table.DataTable(
+                id='mapping_parser_results_table',
+                columns=[{"name": i, "id": i, "deletable": False, "selectable": False} for i in df.columns],
+                data=df.to_dict('records'),
+                editable=False,
+                #filter_action="native",
+                sort_action="native",
+                sort_mode="multi",
+                #column_selectable="single",
+                row_selectable="multi",
+                row_deletable=False,
+                #selected_columns=[],
+                selected_rows=[0],
+                page_action="native",
+                page_current= 0,
+                page_size= 10,
+                hidden_columns=["experiment", "trait", "ref", "alt"],
+                css=[{"selector": ".show-hide", "rule": "display: none"}], # removes "Toggle Columns" button
+
+            )], width={"size": 6, "offset": 2, "order": "last"}),
+        ]),
+        return(image_annotation_card)
+
     ###########################################################################
     ###########################################################################
 
@@ -1234,7 +1404,7 @@ def register_callbacks(dashapp):
         cursorObj = con.cursor()
         df = pd.read_sql_query('''SELECT * 
                         FROM gene_coordinates 
-                        WHERE genotype_id = "{0}"
+                        WHERE genome_id = "{0}"
                         AND gene_chr = "{1}"
                         AND gene_start BETWEEN {2} AND {3}
                         
@@ -1242,7 +1412,7 @@ def register_callbacks(dashapp):
                         
                         SELECT * 
                         FROM gene_coordinates 
-                        WHERE genotype_id = "{0}"
+                        WHERE genome_id = "{0}"
                         AND gene_chr = "{1}"
                         AND gene_end BETWEEN {2} AND {3}
                         '''.format(genotype, chromosome, coordinate-distance, coordinate+distance), con)
