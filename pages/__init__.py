@@ -40,6 +40,11 @@ def create_app():
     from pages.Apps.callbacks import register_callbacks as register_app_callbacks
     register_dashapp(server, 'apps', 'apps', apps_layout, register_app_callbacks)
 
+    from pages.Downloads.layout import layout as apps_layout
+    from pages.Downloads.callbacks import register_callbacks as register_download_callbacks
+    register_dashapp(server, 'downloads', 'downloads', apps_layout, register_download_callbacks)
+
+
     #login_manager = LoginManager()
     #@login_manager.user_loader
     #def load_user(user_id):

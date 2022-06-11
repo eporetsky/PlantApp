@@ -3,7 +3,7 @@ from dash import Dash, dcc, html, Input, Output, State, dash_table
 
 PLOTLY_LOGO = "https://images.plot.ly/logo/new-branding/plotly-logomark.png"
 
-layout = html.Div([ 
+layout = html.Div([
     dcc.Location(id='url', refresh=False),
     # Use a row instead of a number and add cute buttons
     dbc.Navbar([
@@ -12,16 +12,17 @@ layout = html.Div([
         html.P("...", style={"color": "transparent"}),
         #dbc.NavItem(dbc.NavbarBrand("PlantApp")),
         #dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
-        
+
         dbc.DropdownMenu(
-            [dbc.DropdownMenuItem("About", id="home_about", external_link=True, href="/about"),
+            [dbc.DropdownMenuItem("About", id="home_about", external_link=True, href="/index"),
             dbc.DropdownMenuItem("Changelog", id="home_changelog", external_link=True, href="/index/changelog"),
             dbc.DropdownMenuItem("Login", id="home_login", external_link=True, href="/login"),
-            ], label="Home", color="secondary", className="m-1",
+            ], label="Home", color="primary", className="m-1",
             toggle_style={"background": "transparent","border-color": "#f8f9fa"},
         ),
+        
         dbc.DropdownMenu(
-            [dbc.DropdownMenuItem("Available DBs", id="available_dbs", external_link=True, href="/SQNce/available_dbs"), 
+            [dbc.DropdownMenuItem("Available DBs", id="available_dbs", external_link=True, href="/SQNce/available_dbs"),
             dbc.DropdownMenuItem(divider=True),
             dbc.DropdownMenuItem("Gene Descriptions", header=True),
             dbc.DropdownMenuItem("Annotations", id="annotations", external_link=True, href="/SQNce/annotations"),
@@ -40,10 +41,9 @@ layout = html.Div([
             dbc.DropdownMenuItem("Promoters", id="promoters", external_link=True, href="/SQNce/promoters"),
             dbc.DropdownMenuItem(divider=True),
             dbc.DropdownMenuItem("Transcriptomic Data", header=True),
-            dbc.DropdownMenuItem("Gene Expression", id="expression", external_link=True, href="/SQNce/transcriptomics"),
-            dbc.DropdownMenuItem("Transcriptomic Meta-data", disabled=True),
+            dbc.DropdownMenuItem("Transcriptomic Meta-data", header=True),
             dbc.DropdownMenuItem("Omics", id="omics", external_link=True, href="/SQNce/omics"),
-            ], label="SQNce", color="primary", className="m-1",
+            ], label="SQNce", color="secondary", className="m-1",
             toggle_style={"background": "transparent","border-color": "#f8f9fa"},
         ),
         dbc.DropdownMenu(
@@ -51,25 +51,25 @@ layout = html.Div([
             dbc.DropdownMenuItem("Genome Graph", id="genome_graph", external_link=True, href="/apps/genome_graph"),
             dbc.DropdownMenuItem("GO Enrichment", id="go_enrichment", external_link=True, href="/apps/go_enrichment"),
             dbc.DropdownMenuItem("Mapping Summary", id="mapping_summary", external_link=True, href="/apps/mapping_summary"),
-            ], label="Apps", color="primary", className="m-1",
+            ], label="Apps", color="secondary", className="m-1",
+            toggle_style={"background": "transparent","border-color": "#f8f9fa"},
         ),
-        
         dbc.DropdownMenu(
             [dbc.DropdownMenuItem("PlantApp Files", id="download_plantapp", external_link=True, href="/downloads/plantapp"),
             dbc.DropdownMenuItem("User Files", id="download_user", external_link=True, disabled=True, href="/downloads/user"),
             ], label="Downloads", color="primary", className="m-1",
-            toggle_style={"background": "transparent","border-color": "#f8f9fa"},
         ),
-        dbc.Button("Feedback", id="feedback", outline=True, color="secondary", 
+        dbc.Button("Feedback", id="feedback", outline=True, color="secondary",
                     className="m-1", disabled=True),
         ],
         #align="start",
         #style={"margin-left": "15px"}
-        dark =True, 
+        dark =True,
         color="dark",
         sticky = True,
     ),
+
     html.Div(id="tab_content"),
-    ],
-    #fluid=True,
-)
+
+    
+])

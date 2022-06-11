@@ -172,8 +172,9 @@ def register_callbacks(dashapp):
         dbc.Accordion(
         [
             dbc.AccordionItem(
-                "1. Added the changelog section", title="March 2022"
-            ),
+                [html.P("1. Added the changelog section"),
+                 html.P("2. Added the PlantApp data download section")], 
+                 title="March 2022"),
             dbc.AccordionItem(
                 [html.P("1. Added GO enrichment analysis"),
                  html.P("2. Added option to identify mapping candidates")], 
