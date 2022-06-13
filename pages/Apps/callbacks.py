@@ -2,14 +2,10 @@ from numpy import Inf
 
 
 def register_callbacks(dashapp):
-    import pandas as pd
     from collections import OrderedDict
     import dash_bootstrap_components as dbc
-    from dash import Dash, dcc, html, Input, Output, State, dash_table, callback_context
+    from dash import dcc, html, Input, Output, State, dash_table, callback_context
 
-    import csv
-
-    from flask import Flask
     import sqlite3
     import numpy as np
     import plotly.graph_objs as go
@@ -27,7 +23,6 @@ def register_callbacks(dashapp):
 
     import dash
     from dash import no_update # https://community.plotly.com/t/error-expected-the-output-type-to-be-a-list-or-tuple-but-got-none/34744/6
-    from flask import Flask, send_from_directory
     from urllib.parse import quote as urlquote
 
     from io import BytesIO
@@ -40,18 +35,13 @@ def register_callbacks(dashapp):
     from Bio.Seq import Seq
     from PIL import Image
 
-
-    # import numpy as np
+    import numpy as np
+    import pandas as pd
     from io import BytesIO
     import base64
-
-    from flask_login import current_user
     from flask import session
 
-    # import pandas as pd
-    from plotly.tools import mpl_to_plotly
-    import plotly.express as px
-    import matplotlib
+    import seaborn as sns
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
 
@@ -75,6 +65,8 @@ def register_callbacks(dashapp):
             return tab_go_enrichment
         if pathname == "mapping_summary":
             return tab_mapping_summary
+        if pathname == "heatmaps":
+            return tab_heatmaps
 
     ###############################################################################
     #                                Helper Functions
@@ -1451,3 +1443,111 @@ def register_callbacks(dashapp):
         return(ls)
 
    
+    ###############################################################################
+    #                                Heatmaps
+    ###############################################################################
+
+
+    tab_heatmaps = html.Div([
+        html.Br(),
+        dcc.Textarea(
+            id='heatmaps_fc_list',
+            value='Paste list of FC values here',
+            style={'width': '100%', 'height': 100},
+            ),
+        html.Div([
+            dbc.Row([
+                dbc.Col(html.Div(html.P("Column number:")), width={"size": 1, "order": 1, "offset": 0}),
+                dbc.Col(html.Div(dcc.Input(id='heatmaps_row_ln', type="number", size=20, value=6, min=1, max=12, debounce=False,
+                    )), width={"size": 1, "order": 2, "offset": 0},),
+                dbc.Col(html.Div(html.P("Copy example:")), width={"size": 1, "order": 4, "offset": 1}),
+                dbc.Col(html.Div(dcc.Clipboard(content="2\n3\n1\n-1\n-2\n2\n3\n2\n1\n-2\n-2\n3\n2\n3\n1\n0\n0\n1\n-1\n-2\n1", 
+                    style={"fontSize":20})), width={"size": 1, "order": 5, "offset": 0},)
+            ]),
+            dbc.Row([
+                dbc.Col(html.Div(html.P("Set min(-3), max(3) and center(0) values:")), width={"size": 2, "order": "1", "offset": 0}),
+                dbc.Col(html.Div(dcc.Input(id='heatmaps_min', type="number", value=-3, min=-20, max=20,
+                    )), width={"size": 1, "order": "2", "offset": 0},),
+                dbc.Col(html.Div(dcc.Input(id='heatmaps_max', type="number", value=3, min=-20, max=20,
+                    )), width={"size": 1, "order": "3", "offset": 1},),
+                dbc.Col(html.Div(dcc.Input(id='heatmaps_center', type="number", value=0, min=-10, max=10,
+                    )), width={"size": 1, "order": "4", "offset": 1},),
+            ]),
+            dbc.Row([
+                dbc.Col(html.Div(html.P("Add color bar:")), width={"size": 1, "order": 1, "offset": 0}),
+                dbc.Col(html.Div(dcc.Checklist([""], inline=True, id='heatmaps_cbar2')), width={"size": 1, "order": 2, "offset": 0}),
+            ])
+        ]),
+        html.Img(id='heatmap_plot'),
+        ])
+
+    @dashapp.callback(
+        Output('heatmap_plot', 'src'),
+        [Input('heatmaps_fc_list', 'value'),
+         Input('heatmaps_row_ln', 'value'),
+         Input('heatmaps_min', 'value'),
+         Input('heatmaps_max', 'value'),
+         Input('heatmaps_center', 'value'),
+         Input('heatmaps_cbar2', 'value'),],
+        prevent_initial_call=True)
+    def heatmaps_mini_plot(fc_ls, row_len, min, max, center, cbar):
+        # https://stackoverflow.com/questions/49851280/showing-a-simple-matplotlib-plot-in-plotly-dash
+        
+        if cbar==[""]:
+            cbar=True
+        else:
+            cbar=False
+
+        buf = io.BytesIO() # in-memory files
+        fc_ls = fc_ls.split("\n")
+        if fc_ls[-1]=="":
+            fc_ls = fc_ls[:-1]
+        try:
+            min, max, center = int(min), int(max), int(center)
+            fc_ls = [float(fc) for fc in fc_ls]
+        except:
+            return(None)
+        if min >= max:
+            return(None)
+        fc_ln = len(fc_ls) # length of all FC values
+
+        # If number of FC values is smaller than heatmap row length make one row only
+        # mask_ln is used to draw a white ractangle to cover up the extra heatmap cells
+        # seemed to be the simplest solution for drawing a non-rectangular heatmap
+        if fc_ln < row_len:
+            heatmap = pd.DataFrame(np.random.randint(-1, 1, size = (1, fc_ln)))
+            row_num = 1
+            mask_ln = 0
+        # If the remainder is zero then need multiple rows but no masking
+        elif fc_ln % row_len == 0:
+            heatmap = pd.DataFrame(np.random.randint(-1, 1, size = (fc_ln // row_len, row_len)))
+            row_num = fc_ln // row_len
+            mask_ln = 0
+        else:
+            heatmap = pd.DataFrame(np.random.randint(-1, 1, size = (fc_ln // row_len + 1, row_len)))
+            row_num = fc_ln // row_len + 1
+            mask_ln = row_len - fc_ln % row_len
+            
+        # Change the randint values of the heatmap df to FC values
+        for fc in range(fc_ln):
+            heatmap.iloc[fc // row_len, fc % row_len] = fc_ls[fc]
+
+        sns.set(rc={"figure.figsize":(3, 3)})
+        ax = sns.heatmap(heatmap,
+                    cmap="coolwarm",
+                    vmin=min,
+                    vmax=max,
+                    cbar=cbar,
+                    center=center,
+                    linewidths = 2,
+                    linecolor="black",
+                    square=True, 
+                    xticklabels=False,
+                    yticklabels=False)
+        # sns.heatmap doesn't draw right and bottom border line for some reason so I manually add it
+        ax.add_patch(Rectangle((0,0), row_len, row_num, edgecolor='black', fill=False, lw=4))
+        ax.add_patch(Rectangle((row_len + 0.05 - mask_ln, fc_ln // row_len + 0.05), mask_ln-0.005, 0.95, color='white'))
+        plt.savefig(buf, format = "png", transparent=True) # save to the above file object
+        plt.close()
+        data = base64.b64encode(buf.getbuffer()).decode("utf8") # encode to html elements
+        return ("data:image/png;base64,{}".format(data))

@@ -14,7 +14,7 @@ layout = html.Div([
         #dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
         
         dbc.DropdownMenu(
-            [dbc.DropdownMenuItem("About", id="home_about", external_link=True, href="/about"),
+            [dbc.DropdownMenuItem("About", id="home_about", external_link=True, href="/index"),
             dbc.DropdownMenuItem("Changelog", id="home_changelog", external_link=True, href="/index/changelog"),
             dbc.DropdownMenuItem("Login", id="home_login", external_link=True, href="/login"),
             ], label="Home", color="secondary", className="m-1",
@@ -51,6 +51,8 @@ layout = html.Div([
             dbc.DropdownMenuItem("Genome Graph", id="genome_graph", external_link=True, href="/apps/genome_graph"),
             dbc.DropdownMenuItem("GO Enrichment", id="go_enrichment", external_link=True, href="/apps/go_enrichment"),
             dbc.DropdownMenuItem("Mapping Summary", id="mapping_summary", external_link=True, href="/apps/mapping_summary"),
+            dbc.DropdownMenuItem(divider=True),
+            dbc.DropdownMenuItem("Heatmaps", id="heatmaps", external_link=True, href="/apps/heatmaps"),
             ], label="Apps", color="primary", className="m-1",
         ),
         

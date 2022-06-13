@@ -50,6 +50,8 @@ layout = html.Div([
             dbc.DropdownMenuItem("Genome Graph", id="genome_graph", external_link=True, href="/apps/genome_graph"),
             dbc.DropdownMenuItem("GO Enrichment", id="go_enrichment", external_link=True, href="/apps/go_enrichment"),
             dbc.DropdownMenuItem("Mapping Summary", id="mapping_summary", external_link=True, href="/apps/mapping_summary"),
+            dbc.DropdownMenuItem(divider=True),
+            dbc.DropdownMenuItem("Heatmaps", id="heatmaps", external_link=True, href="/apps/heatmaps"),
             ], label="Apps", color="secondary", className="m-1",
             toggle_style={"background": "transparent","border-color": "#f8f9fa"},
         ),
