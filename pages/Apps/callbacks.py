@@ -479,8 +479,24 @@ def register_callbacks(dashapp):
             options=[{'label': 'FDR', 'value': 'FDR'}],
             value="FDR"
         ),
+        dcc.Clipboard(id="go_enrichment_copy", style={"fontSize":20}),
         html.Div(id="go_enrichment_table"),
         ])
+
+    @dashapp.callback(
+        Output("go_enrichment_copy", "content"),
+        Input("go_enrichment_copy", "n_clicks"),
+        State("go_enrichment_state", "data"),
+    )
+    def custom_copy(_, data):
+        dff = pd.DataFrame(data)
+        # Need to order columns because it gets shuffled
+        dff = dff[['GO_id', 'gene_id', 'GO_count', 'genome_count', 'group_count', 'pval',
+                'adj','FC_enrichment', 'process', 'GO_short', 'GO_long']]
+        dff = dff[dff['adj']<0.05]
+        # See options for .to_csv() or .to_excel() or .to_string() in the  pandas documentation
+        return dff.to_csv(index=False, sep="\t")  # includes headers
+
 
     @dashapp.callback(
         Output('go_enrichment_table', 'children'),
@@ -495,8 +511,8 @@ def register_callbacks(dashapp):
 
         try:
             gene_list = value.split("\n")
-            if len(gene_list) > 1000:
-                gene_list = gene_list[:1000]
+            if len(gene_list) > 10000:
+                gene_list = gene_list[:10000]
             if gene_list[-1]=="":
                 gene_list = gene_list[:-1]
         except:
@@ -508,7 +524,7 @@ def register_callbacks(dashapp):
                                 WHERE genome_id =  ?  ''', (genome,))
             # (name,) - need the comma to treat it as a single item and not list of letters
             selected = cursorObj.fetchall()
-            print(genome, selected)
+            #print(genome, selected)
             genome_count = selected[0][0]
             ls = []
             for entity in gene_list:
@@ -532,7 +548,7 @@ def register_callbacks(dashapp):
             GO_df["adj"] = list(multipletests(GO_df["pval"].values.tolist(), method="fdr_bh")[1])
             GO_df["FC_enrichment"] = (GO_df["gene_id"] / GO_df["GO_count"]) / (GO_df["group_count"] / GO_df["genome_count"])
             
-            print(GO_df)
+            #print(GO_df)
             
             ls1 = []
             for entity in GO_df.index:
@@ -550,6 +566,7 @@ def register_callbacks(dashapp):
             GO_df = GO_df.reset_index()
             output_df = pd.concat([GO_df, GO_basic], axis=1)
             return dash_table.DataTable(
+                id="go_enrichment_state",
                 columns=[{"name": i, "id": i} for i in output_df.columns],
                 data=output_df.to_dict('records'),
                 style_cell={'textAlign': 'left',
