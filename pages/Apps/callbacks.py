@@ -1466,37 +1466,56 @@ def register_callbacks(dashapp):
 
 
     tab_heatmaps = html.Div([
-        html.Br(),
-        dcc.Textarea(
-            id='heatmaps_fc_list',
-            value='Paste list of FC values here',
-            style={'width': '100%', 'height': 100},
-            ),
-        html.Div([
-            dbc.Row([
-                dbc.Col(html.Div(html.P("Column number:")), width={"size": 1, "order": 1, "offset": 0}),
-                dbc.Col(html.Div(dcc.Input(id='heatmaps_row_ln', type="number", size=20, value=6, min=1, max=12, debounce=False,
-                    )), width={"size": 1, "order": 2, "offset": 0},),
-                dbc.Col(html.Div(html.P("Copy example:")), width={"size": 1, "order": 4, "offset": 1}),
-                dbc.Col(html.Div(dcc.Clipboard(content="2\n3\n1\n-1\n-2\n2\n3\n2\n1\n-2\n-2\n3\n2\n3\n1\n0\n0\n1\n-1\n-2\n1", 
-                    style={"fontSize":20})), width={"size": 1, "order": 5, "offset": 0},)
-            ]),
-            dbc.Row([
-                dbc.Col(html.Div(html.P("Set min(-3), max(3) and center(0) values:")), width={"size": 2, "order": "1", "offset": 0}),
-                dbc.Col(html.Div(dcc.Input(id='heatmaps_min', type="number", value=-3, min=-20, max=20,
-                    )), width={"size": 1, "order": "2", "offset": 0},),
-                dbc.Col(html.Div(dcc.Input(id='heatmaps_max', type="number", value=3, min=-20, max=20,
-                    )), width={"size": 1, "order": "3", "offset": 1},),
-                dbc.Col(html.Div(dcc.Input(id='heatmaps_center', type="number", value=0, min=-10, max=10,
-                    )), width={"size": 1, "order": "4", "offset": 1},),
-            ]),
-            dbc.Row([
-                dbc.Col(html.Div(html.P("Add color bar:")), width={"size": 1, "order": 1, "offset": 0}),
-                dbc.Col(html.Div(dcc.Checklist([""], inline=True, id='heatmaps_cbar2')), width={"size": 1, "order": 2, "offset": 0}),
-            ])
-        ]),
-        html.Img(id='heatmap_plot'),
-        ])
+        html.Div(
+            className="row", children=[
+                html.Div(children=[dcc.Textarea(id='heatmaps_fc_list',
+                    value='Paste list of FC values here',
+                    style={'width': '80%', 'height': 100, 'marginBottom': 10, 'marginTop': 20},
+                    )], className='six columns', style=dict(width='80%')),
+            ], style=dict(display='flex')),
+        
+        html.Div(
+            # https://css-tricks.com/wp-content/uploads/2022/02/css-flexbox-poster.png
+            className="row", children=[
+                html.Div(children=[html.P("Column number:")], 
+                    className='six columns', style=dict(width='8%')),
+                html.Div(children=[dcc.Input(id='heatmaps_row_ln', type="number", size=20, value=6, min=1, max=12, debounce=False,
+                    style={'marginLeft':'-20px', 'width':'40px'})], className='six columns', style=dict(width='2%')),
+                html.Div(children=[html.P("Copy example:")],
+                    className='six columns', style=dict(width='7%')),
+                html.Div(children=[dcc.Clipboard(content="2\n3\n1\n-1\n-2\n2\n3\n2\n1\n-2\n-2\n3\n2\n3\n1\n0\n0\n1\n-1\n-2\n1")], 
+                    className='six columns', style=dict(width='5%')),
+            ], style=dict(display='flex', justifyContent='flex-start')),
+        
+        html.Div(
+            className="row", children=[
+                html.Div(children=[html.P("Set min(-3), max(3) and center(0) values:")],
+                    className='six columns', style=dict(width='17%')),
+                html.Div(children=[dcc.Input(id='heatmaps_min', type="number", value=-3, min=-20, max=20,
+                    style=dict(width='40px', marginLeft='-20px')),],
+                    className='six columns', style=dict(width='2%')),
+                html.Div(children=[dcc.Input(id='heatmaps_max', type="number", value=3, min=-20, max=20,
+                    style=dict(width='40px', marginLeft='-20px'))],
+                    className='six columns', style=dict(width='2%')),
+                html.Div(children=[dcc.Input(id='heatmaps_center', type="number", value=0, min=-10, max=10,
+                    style=dict(width='40px', marginLeft='-20px'))],
+                    className='six columns', style=dict(width='2%')),
+            ], style=dict(display='flex', justifyContent='flex-start')),
+        
+        html.Div(
+            className="row", children=[
+                html.Div(children=[html.P("Add color bar:")],
+                    className='six columns', style=dict(width='7%')),
+                html.Div(children=[dcc.Checklist([""], inline=True, id='heatmaps_cbar2')],
+                    className='six columns', style=dict(width='3%')),
+            ], style=dict(display='flex', justifyContent='flex-start')),
+        
+        html.Div(
+            className="row", children=[
+                html.Div(children=[html.Img(id='heatmap_plot')],
+                    className='six columns', style=dict(width='50%')),
+            ], style=dict(display='flex', justifyContent='flex-start')),
+        ], style=dict(marginLeft=20))
 
     @dashapp.callback(
         Output('heatmap_plot', 'src'),
