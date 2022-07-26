@@ -66,16 +66,19 @@ def register_callbacks(dashapp):
         # Returns a list of all values in a specific table from SQNce.db
         # Custom vals are added to the front using nested list of [label, value]
         # Use return_ls for clean list of distinct values, not for dropdown menu
-        ls = [{ 'label': label, 'value': val} for label, val in custom_vals]
-        con = sqlite3.connect(db) # deploy with this
-        cursorObj = con.cursor()
-        distinct_df = pd.read_sql_query('''SELECT DISTINCT {0} 
-                                        FROM {1}'''.format(column, table), con)
-        if return_ls:
-            return(distinct_df[column].to_list())
-        for name in distinct_df[column]:
-            ls.append({'label': name, 'value': name})
-        return(ls)
+        try:
+            ls = [{ 'label': label, 'value': val} for label, val in custom_vals]
+            con = sqlite3.connect(db) # deploy with this
+            cursorObj = con.cursor()
+            distinct_df = pd.read_sql_query('''SELECT DISTINCT {0} 
+                                            FROM {1}'''.format(column, table), con)
+            if return_ls:
+                return(distinct_df[column].to_list())
+            for name in distinct_df[column]:
+                ls.append({'label': name, 'value': name})
+            return(ls)
+        except:
+            return None
 
     ###############################################################################
     #                                Coordinates
@@ -86,7 +89,7 @@ def register_callbacks(dashapp):
         # Get a list of unique genotypes from the db
         dcc.Dropdown(
             id='coordinates_genotypes_dropdown',
-            options=distinct_db_vals(sqnce_path, "gene_coordinates", "genotype_id", 
+            options=distinct_db_vals(sqnce_path, "gene_coordinates", "genome_id", 
                                      [["None", "None"]]),
             value="None"
         ),
@@ -123,9 +126,21 @@ def register_callbacks(dashapp):
             dcc.Download(id="download_coordinate_table"),
         ])),
         dcc.Clipboard(id="coordinate_table_copy", style={"fontSize":20}),
+        dbc.Button("Show example coordinates", color="primary", id="btn_coordinate_example", className="mr-1"),
 
         html.Div(id="coordinates_table"),
     ]),
+
+    @dashapp.callback(
+        Output('coordinates_genotypes_dropdown', 'value'),
+        Output('coordinates_range_dropdown', 'value'),
+        Output('coordinates_dedupe_dropdown', 'value'),
+        Output('coordinates_list', 'value'),
+        Input('btn_coordinate_example', 'n_clicks'),
+        prevent_initial_call=True,)
+    def symbolcoordinate_example(value):
+        return "B73v4", 1000, True, '1	8574461'
+
 
     # Query to find neighboring genes
     def get_SNP_neighbors(genotype, chromsome, coordinate, distance):
@@ -133,7 +148,7 @@ def register_callbacks(dashapp):
         cursorObj = con.cursor()
         df = pd.read_sql_query('''SELECT * 
                         FROM gene_coordinates 
-                        WHERE genotype_id = "{0}"
+                        WHERE genome_id = "{0}"
                         AND gene_chr = "{1}"
                         AND gene_start BETWEEN {2} AND {3}
                         
@@ -141,7 +156,7 @@ def register_callbacks(dashapp):
                         
                         SELECT * 
                         FROM gene_coordinates 
-                        WHERE genotype_id = "{0}"
+                        WHERE genome_id = "{0}"
                         AND gene_chr = "{1}"
                         AND gene_end BETWEEN {2} AND {3}
                         '''.format(genotype, chromsome, coordinate-distance, coordinate+distance), con)
@@ -226,16 +241,18 @@ def register_callbacks(dashapp):
     def get_studies_in_species(selected_species):
         con = sqlite3.connect(sqnce_path) # deploy with this
         cursorObj = con.cursor()
-        sql_query = """SELECT studies.study_accession
+        try:
+            sql_query = """SELECT studies.study_accession
                     FROM studies
                     WHERE studies.scientific_name='%s'
-        """%(selected_species)
-        studies_in_species_df = pd.read_sql(sql_query, con = con)
-        studies_in_species_list = [{'label': "Select all", 'value': "all"}]
-        for name in studies_in_species_df["study_accession"]:
-            studies_in_species_list.append({'label': name, 'value': name})
-        return(studies_in_species_list)
-
+            """%(selected_species)
+            studies_in_species_df = pd.read_sql(sql_query, con = con)
+            studies_in_species_list = [{'label': "Select all", 'value': "all"}]
+            for name in studies_in_species_df["study_accession"]:
+                studies_in_species_list.append({'label': name, 'value': name})
+            return(studies_in_species_list)
+        except:
+            return None
     @dashapp.callback(
         Output('studies-in-species-dropdown-div', 'children'),
         Input('studies-species-dropdown', 'value'))
@@ -327,10 +344,12 @@ def register_callbacks(dashapp):
 
     tab_annotation_content = html.Div([
         dcc.Textarea(
-            id='gene-list',
+            id='annotation_gene_list',
             value='Textarea content initialized\nwith multiple lines of text',
             style={'width': '100%', 'height': 100},
             ),
+
+        dbc.Button("Show example annotaion", color="primary", id="btn_annotation_example", className="mr-1"),
 
         html.Div(id="annotation_table"),
         ])
@@ -351,8 +370,16 @@ def register_callbacks(dashapp):
         return(ls)
 
     @dashapp.callback(
+        Output('annotation_gene_list', 'value'),
+        Input('btn_annotation_example', 'n_clicks'),
+        prevent_initial_call=True,)
+    def annotation_example(value):
+        return("Zm00001d021929\nZm00001d006678\nZm00001d008370\nZm00001d051416\nZm00001d017540\nZm00001d021410")
+
+    
+    @dashapp.callback(
         Output('annotation_table', 'children'),
-        Input('gene-list', 'value'))
+        Input('annotation_gene_list', 'value'))
     def get_gene_list(value):
         con = sqlite3.connect(sqnce_path) # deploy with this
         try:
@@ -389,6 +416,8 @@ def register_callbacks(dashapp):
             style={'width': '100%', 'height': 100},
             ),
 
+        dbc.Button("Show example symbols", color="primary", id="btn_symbols_example", className="mr-1"),
+
         html.Div(id="symbols_table"),
         ])
 
@@ -406,6 +435,13 @@ def register_callbacks(dashapp):
             else:
                 ls.append(selected[0][1])    
         return(ls)
+
+    @dashapp.callback(
+        Output('symbols_gene_list', 'value'),
+        Input('btn_symbols_example', 'n_clicks'),
+        prevent_initial_call=True,)
+    def symbols_example(value):
+        return("Zm00001d021929\nZm00001d006678\nZm00001d008370\nZm00001d051416\nZm00001d017540\nZm00001d021410")
 
     @dashapp.callback(
         Output('symbols_table', 'children'),
@@ -442,7 +478,7 @@ def register_callbacks(dashapp):
     tab_family_familyIDs_content = html.Div([
         dcc.Dropdown(
             id='family_select_species_dropdown',
-            options=distinct_db_vals(sqnce_path, "gene_families", "genotype_id", 
+            options=distinct_db_vals(sqnce_path, "gene_families", "genome_id", 
                                     [["All", "all"]]),
             value="all",
             multi=True,
@@ -471,12 +507,12 @@ def register_callbacks(dashapp):
         con = sqlite3.connect(sqnce_path) # deploy with this
         cursorObj = con.cursor()
         if  "all" in genotypes or genotypes == "all":
-            genotypes = distinct_db_vals(sqnce_path, "gene_families", "genotype_id", return_ls=True) 
+            genotypes = distinct_db_vals(sqnce_path, "gene_families", "genome_id", return_ls=True) 
         genotypes = str("','".join(genotypes))
         families = str("','".join(families))
-        df = pd.read_sql_query("""SELECT protein_id, genotype_id, family_name 
+        df = pd.read_sql_query("""SELECT protein_id, genome_id, family_name 
                                 FROM gene_families
-                                WHERE genotype_id IN ('{0}') AND family_name IN ('{1}')""".format(genotypes, families), con)
+                                WHERE genome_id IN ('{0}') AND family_name IN ('{1}')""".format(genotypes, families), con)
         try:
             return dash_table.DataTable(
                 id="family_table_state",
@@ -498,7 +534,8 @@ def register_callbacks(dashapp):
             value='Insert gene or gene-family list here, one id per row.',
             style={'width': '100%', 'height': 100},
             ),
-            html.Div(id="family_geneIDs_table"),
+        dbc.Button("Show example families", color="primary", id="btn_family_example", className="mr-1"),
+        html.Div(id="family_geneIDs_table"),
         ])
     
     def family_gene_select(con, gene_list):
@@ -507,7 +544,7 @@ def register_callbacks(dashapp):
         family_ls = []
         for gene in gene_list:
             cursorObj = con.cursor()
-            cursorObj.execute('''SELECT genotype_id, family_name 
+            cursorObj.execute('''SELECT genome_id, family_name 
                                 FROM gene_families
                                 WHERE protein_id =  ? ''', (gene,))
             selected = cursorObj.fetchall()
@@ -519,6 +556,14 @@ def register_callbacks(dashapp):
                 family_ls.append(selected[0][1])
         return([genotype_ls, family_ls])
     
+    @dashapp.callback(
+        Output('family_gene_list', 'value'),
+        Input('btn_family_example', 'n_clicks'),
+        prevent_initial_call=True,)
+    def family_example(value):
+        return("Zm00001d021929\nZm00001d006678\nZm00001d008370\nZm00001d051416\nZm00001d017540\nZm00001d021410")
+
+
     @dashapp.callback(
         Output("family_geneIDs_table", "children"),
         Input('family_gene_list', 'value'),
@@ -581,11 +626,23 @@ def register_callbacks(dashapp):
             value='Inert gene IDs to search for, one row per gene.',
             style={'width': '100%', 'height': 100},
         ),
+        dbc.Button("Show example BBHs", color="primary", id="btn_BBHs_example", className="mr-1"),
+        html.Div(id="BBHs_missing"),
         html.Div(id="BBHs_table"),
-        html.Div(id="BBHs_missing")
         ])
 
-    
+    @dashapp.callback(
+        Output('BBHs_gene_list', 'value'),
+        Output('dropdown_BBHs_column_select', 'value'),
+        Output('dropdown_BBHs_query_genotype_select', 'value'),
+        Output('dropbox_show_best_only', 'value'),
+        Input('btn_BBHs_example', 'n_clicks'),
+        prevent_initial_call=True,)
+    def BBHs_example(value):
+        print("stestfd")
+        return "Zm00001d021929", "subject_id", 'All',  "only"
+
+
         # selected: variable to select either subject_id or query_id from BBHs table
     @dashapp.callback(
         Output("BBHs_table", "children"),
@@ -597,6 +654,7 @@ def register_callbacks(dashapp):
         
     )
     def BBHs_select(selected, genotypes, show_best_only, entity_list):
+        print(entity_list)
         gene_list = entity_list.split("\n")
         if len(gene_list) > 500:
             gene_list = gene_list[:500]
@@ -611,10 +669,10 @@ def register_callbacks(dashapp):
                         WHERE {0} IN ('{1}')""".format(selected, gene_list_str), con)
         try:
             if "All" not in genotypes:
-                df = df[df["query_genotype"].isin(genotypes)]
+                df = df[df["query_genome"].isin(genotypes)]
             if show_best_only == "only":
                 # This is a stupid function but it seems to work correctly.
-                df = df.sort_values(['bit_score'], ascending=False).groupby(["subject_id", "query_genotype"]).agg({"bit_score": "first", "query_id": "first",}).reset_index()
+                df = df.sort_values(['bit_score'], ascending=False).groupby(["subject_id", "query_genome"]).agg({"bit_score": "first", "query_id": "first",}).reset_index()
             missing_str = ''
             for gene in gene_list:
                 if gene not in list(df["subject_id"]):
@@ -637,7 +695,7 @@ def register_callbacks(dashapp):
 
     tab_protein_content = html.Div([
         dcc.Textarea(
-            id='protein-gene-list',
+            id='protein_gene_list',
             value='Textarea content initialized\nwith multiple lines of text',
             style={'width': '100%', 'height': 100},
             ),
@@ -646,6 +704,7 @@ def register_callbacks(dashapp):
             dbc.Button("Download fasta with gene IDs", color="primary", id="btn_download_fasta_geneIDs", className="mr-1"),
             dcc.Download(id="download_fasta_geneIDs"),
             dbc.Button("Download fasta with symbols", color="primary", className="mr-1"),
+            dbc.Button("Show example sequences", color="primary", id="btn_protein_example", className="mr-1"),
         ])),
         dcc.Clipboard(id="protein_table_copy", style={"fontSize":20}),
         html.Div(id="protein_seq_table"),
@@ -664,8 +723,15 @@ def register_callbacks(dashapp):
         return(od)
 
     @dashapp.callback(
+        Output('protein_gene_list', 'value'),
+        Input('btn_protein_example', 'n_clicks'),
+        prevent_initial_call=True,)
+    def proteins_example(value):
+        return("Zm00001d021929\nZm00001d006678\nZm00001d008370\nZm00001d051416\nZm00001d017540\nZm00001d021410")
+
+    @dashapp.callback(
         Output('protein_seq_table', 'children'),
-        Input('protein-gene-list', 'value'))
+        Input('protein_gene_list', 'value'))
     def get_protein_list(value):
         con = sqlite3.connect(sqnce_path) # deploy with this
         try:
@@ -723,12 +789,12 @@ def register_callbacks(dashapp):
 
     tab_promoter_content = html.Div([
         dcc.Dropdown(
-            id='promoters-kind-dropdown',
+            id='promoters_kind_dropdown',
             options=[{'label': "TSS", 'value': "TSS"}, {'label': "ATG", 'value': "ATG"}],
             value="TSS"
             ),
         dcc.Textarea(
-            id='promoter-gene-list',
+            id='promoter_gene_list',
             value='Insert list of genes to\nget a list of promoter sequences',
             style={'width': '100%', 'height': 100},
             ),
@@ -737,6 +803,7 @@ def register_callbacks(dashapp):
             dbc.Button("Download fasta with gene IDs", color="primary", id="btn_promoter_download_fasta_geneIDs", className="mr-1"),
             dcc.Download(id="download_promoter_fasta_geneIDs"),
             dbc.Button("Download fasta with symbols", color="primary", className="mr-1"),
+            dbc.Button("Show example promoters", color="primary", id="btn_promoters_example", className="mr-1"),
         ])),
         dcc.Clipboard(id="promoter_table_copy", style={"fontSize":20}),
         html.Div(id="promoter_seq_table"),
@@ -756,9 +823,18 @@ def register_callbacks(dashapp):
         return(od)
 
     @dashapp.callback(
+        Output('promoters_kind_dropdown', 'value'),
+        Output('promoter_gene_list', 'value'),
+        Input('btn_promoters_example', 'n_clicks'),
+        prevent_initial_call=True,)
+    def promoter_example(value):
+        return "ATG", "Zm00001d021929\nZm00001d006678\nZm00001d008370\nZm00001d051416\nZm00001d017540\nZm00001d021410"
+
+
+    @dashapp.callback(
         Output('promoter_seq_table', 'children'),
-        Input('promoter-gene-list', 'value'),
-        Input('promoters-kind-dropdown', 'value'))
+        Input('promoter_gene_list', 'value'),
+        Input('promoters_kind_dropdown', 'value'))
     def get_promoter_list(gene_list, promoter_kind):
         con = sqlite3.connect(sqnce_path) # deploy with this
         try:
@@ -819,7 +895,7 @@ def register_callbacks(dashapp):
             value='Textarea content initialized\nwith multiple lines of text',
             style={'width': '100%', 'height': 100},
             ),
-
+        dbc.Button("Show example transcriptomics", color="primary", id="btn_transcriptomics_example", className="mr-1"),
         html.Div(id="transcriptomics_annotation_table"),
         ])
 
@@ -831,6 +907,14 @@ def register_callbacks(dashapp):
         df = con.execute("""SELECT * FROM PanNAM
                             WHERE target_id IN ('{0}');""".format(query_list)).fetchdf()
         return(df)
+
+    @dashapp.callback(
+        Output('transcriptomics_gene_list', 'value'),
+        Input('btn_transcriptomics_example', 'n_clicks'),
+        prevent_initial_call=True,)
+    def symbols_example(value):
+        return("Zm00001d021929\nZm00001d006678\nZm00001d008370\nZm00001d051416\nZm00001d017540\nZm00001d021410")
+
 
     @dashapp.callback(
         Output('transcriptomics_annotation_table', 'children'),
@@ -857,4 +941,3 @@ def register_callbacks(dashapp):
                 row_deletable=True,)
         except:
             return(html.P("Something did not work returning the table"))
-        

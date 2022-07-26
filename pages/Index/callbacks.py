@@ -53,22 +53,36 @@ def register_callbacks(dashapp):
         dbc.Col([
             dbc.Container([
                 html.H1("Welcome to PlantApp", className="display-6"),
-                html.P("""PlantApp contains different tools for comparative genomics analysis and it uses SQNce,
-                    as a back-end. SQNce is a SQLite-based database framework for parsing commonly used gene-annotation files.
-                    PlantApp aggregates publicly available data from different sequenced plant species and genotypes and offers an
-                    easy-to-access and easy-to-download database.""",
+                html.P("""My name is Elly Poretsky and I am a post-doc at UC San Diego studying the genetic diversity of root specialized metbolites 
+                    in maize and their role in protecting plants against pathogens and reshaping the root microbiome. My research relies heavily on
+                    multiple plant genomic databases (including MaizeGDB and Phytozome) and comparative genomic tools (including NCBI, CoGe, and InterPro). 
+                    I started developing PlantApp in August 2021 with the goal of creating a lightweight repository that aggregates primarily gene-centric 
+                    information from multiple plant genomes using a variety of information and annotation sources. As the development of PlantApp continues,
+                    I hope that it will become an increasingly better tool to facilitate comparative genomics research across plant species. Additionaly,
+                    with time more genomes will be included in PlantApp, including genomes from crops, reference organisms and species of conservation concern. 
+                    """,
+                    #"featured content or information.",
+                    className="lead",
+                ),
+                html.P("""PlantApp contains different tools for comparative genomics analysis and it uses SQNce, as a back-end. SQNce is a SQLite-based 
+                    database framework for parsing commonly used gene-annotation files. PlantApp aggregates publicly available data from different sequenced
+                    plant species and genotypes and offers an easy-to-access and easy-to-download database. Like PlantApp, SQNce is also under development 
+                    and is being updated fairly often. For more information on SQNce visit: https://github.com/eporetsky/SQNce. For additional information 
+                    you can visit my personal research page (https://eporetsky.github.io/) or get in touch on Twitter (@externelly).""",
                     #"featured content or information.",
                     className="lead",
                 ),
                 html.Hr(className="my-2"),
-                html.P("""The website, database queries and apps are all under development but all the individual components function are functional.  
+                html.P("""The website, database queries and apps are all under development but all the individual components are mostly functional. 
+                    I am planning to add some screenshots and examples on how I intended the different sections to work. Let me know if you have and questions
+                    or requests.
                 """
                 ),
                 ],
                 fluid=True,
                 className="py-3"
                 ),
-            ], width={"size": 4, "order":1, "offset": 1},
+            ], width={"size": 6, "order":1, "offset": 1},
         ),
 
 
@@ -154,7 +168,7 @@ def register_callbacks(dashapp):
                 fluid=True,
                 className="py-3"
             ),
-            ], width={"size": 4, "order":2, "offset": 2},
+            ], width={"size": 4, "order":2, "offset": 0},
         ),
     ])
 
@@ -172,9 +186,12 @@ def register_callbacks(dashapp):
         dbc.Accordion(
         [
             dbc.AccordionItem(
+                [html.P("1. Added example buttons to queries")], 
+                 title="July 2022"),
+            dbc.AccordionItem(
                 [html.P("1. Added the changelog section"),
                  html.P("2. Added the PlantApp data download section")], 
-                 title="March 2022"),
+                 title="June 2022"),
             dbc.AccordionItem(
                 [html.P("1. Added GO enrichment analysis"),
                  html.P("2. Added option to identify mapping candidates")], 
