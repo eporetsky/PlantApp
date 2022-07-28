@@ -42,6 +42,7 @@ def register_callbacks(dashapp):
     from flask import session
 
     import seaborn as sns
+    import matplotlib
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
 
@@ -102,10 +103,19 @@ def register_callbacks(dashapp):
                 value='Paste gene list',
                 style={'width': '100%', 'height': 100},
                 ),
-        html.Button('Prepare alignment and tree', id='simple_tree_aln_button', type='submit'),
+        html.Button('Prepare tree', id='simple_tree_aln_button', type='submit'),
+        html.Button("Add example genes (then press prepare tree button)", id="btn_tree_example", className="mr-1"),
         html.Div(id='simple_tree_tree_figure'),
         #html.Div([html.Img(id = 'simple_tree_tree_figure', src = '')], id='plot_div'),
         ])
+
+    @dashapp.callback(
+        Output('simple_tree_gene_list', 'value'),
+        Input('btn_tree_example', 'n_clicks'),
+        prevent_initial_call=True,)
+    def annotation_example(value):
+        return("Zm00001d021929\nZm00001d006678\nZm00001d008370\nZm00001d051416\nZm00001d017540\nZm00001d021410")
+
 
     def simple_tree_write_fasta(con, entity_list, session_id):
         od = OrderedDict()
@@ -253,9 +263,18 @@ def register_callbacks(dashapp):
                 style={'width': '100%', 'height': 100},
                 ),
         html.Button('Prepare genome graph figure', id='genome_graph_button', type='submit'),
+        html.Button("Add example genes (then press prepare genome graph button) ", id="btn_genome_graph_example", className="mr-1"),
         html.Div(id='genome_graph_figure'),
         #html.Div([html.Img(id = 'simple_tree_tree_figure', src = '')], id='plot_div'),
     ])
+
+    @dashapp.callback(
+        Output('genome_graph_genotypes_dropdown', 'value'),
+        Output('genome_graph_list', 'value'),
+        Input('btn_genome_graph_example', 'n_clicks'),
+        prevent_initial_call=True,)
+    def genome_graph_example(value):
+        return "B73v4", "Zm00001d021929\nZm00001d006678\nZm00001d008370\nZm00001d051416\nZm00001d017540\nZm00001d021410"
 
     # Query to find neighboring genes
     def get_gene_coordinates(genotype, gene_id):
@@ -1481,7 +1500,7 @@ def register_callbacks(dashapp):
                     className='six columns', style=dict(width='8%')),
                 html.Div(children=[dcc.Input(id='heatmaps_row_ln', type="number", size=20, value=6, min=1, max=12, debounce=False,
                     style={'marginLeft':'-20px', 'width':'40px'})], className='six columns', style=dict(width='2%')),
-                html.Div(children=[html.P("Copy example:")],
+                html.Div(children=[html.P("Copy example to clipboard:")],
                     className='six columns', style=dict(width='7%')),
                 html.Div(children=[dcc.Clipboard(content="2\n3\n1\n-1\n-2\n2\n3\n2\n1\n-2\n-2\n3\n2\n3\n1\n0\n0\n1\n-1\n-2\n1")], 
                     className='six columns', style=dict(width='5%')),
