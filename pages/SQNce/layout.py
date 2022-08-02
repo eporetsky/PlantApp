@@ -30,6 +30,7 @@ layout = html.Div([
             dbc.DropdownMenuItem("Get Family Names of Genes", id="families_geneIDs", external_link=True, href="/SQNce/families_geneIDs"),
             dbc.DropdownMenuItem(divider=True),
             dbc.DropdownMenuItem("Gene Relations", header=True),
+            dbc.DropdownMenuItem("Orthogroups", id="orthogroups", external_link=True, href="/SQNce/orthogroups"),
             dbc.DropdownMenuItem("Blast Best Hits (BBHs)", id="BBHs", external_link=True, href="/SQNce/BBHs"),
             dbc.DropdownMenuItem(divider=True),
             dbc.DropdownMenuItem("Gene Coordinates", header=True),

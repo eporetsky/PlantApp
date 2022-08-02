@@ -45,6 +45,8 @@ def register_callbacks(dashapp):
             return tab_family_familyIDs_content
         elif pathname == "families_geneIDs":
             return tab_family_geneIDs_content
+        elif pathname == "orthogroups":
+            return tab_orthogroups_content        
         elif pathname == "BBHs":
             return tab_BBHs_content
         elif pathname == "proteins":
@@ -596,6 +598,63 @@ def register_callbacks(dashapp):
             return(html.P("Something did not work returning the table"))
 
     ###############################################################################
+    #                                Orthogroups
+    ###############################################################################
+    tab_orthogroups_content = html.Div([
+        dcc.Textarea(
+            id='orthogroups_gene_list',
+            value='Textarea content initialized\nwith multiple lines of text',
+            style={'width': '100%', 'height': 100},
+            ),
+        dbc.Row(dbc.Col(
+            [
+            dbc.Button("Download fasta with gene IDs", color="primary", id="btn_orthogroups_download_fasta_geneIDs", className="mr-1"),
+            dcc.Download(id="download_orthogroups_fasta_geneIDs"),
+            dbc.Button("Download fasta with symbols", color="primary", className="mr-1"),
+        ])),
+        dcc.Clipboard(id="orthogroups_table_copy", style={"fontSize":20}),
+        html.Div(id="orthogroups_seq_table"),
+        ])
+
+    @dashapp.callback(
+        Output('orthogroups_seq_table', 'children'),
+        Input('orthogroups_gene_list', 'value'))
+    def get_protein_list(gene_id):
+        con = sqlite3.connect(sqnce_path) # deploy with this
+        cursorObj = con.cursor()
+        print(gene_id)
+        try:
+            if "\n" in gene_id:
+                gene_id = gene_id.split("\n")[-1]
+            print("bla")
+            df = pd.read_sql_query("""SELECT orthogroup, genome_id, gene_id
+                    FROM orthogroups
+                    WHERE orthogroup in (
+                            SELECT orthogroup
+                            FROM orthogroups
+                            WHERE gene_id = '{0}' )""".format(gene_id), con)
+            print("bla2")
+            selected = cursorObj.fetchall()
+            print(selected)
+            print("test")
+        except:
+            return(html.P("Something did not work reading the gene list"))
+        try:
+            return dash_table.DataTable(
+                id="orthogroups_table_state",
+                columns=[{"name": i, "id": i} for i in df.columns],
+                data=df.to_dict('records'),
+                style_cell={'textAlign': 'left',
+                            'overflow': 'hidden',
+                            'maxWidth': 0,},
+                editable=True,
+                row_deletable=True,)
+        except:
+            return(html.P("Something did not work returning the table"))
+
+
+
+    ###############################################################################
     #                                BBHs
     ###############################################################################
     BBHs_query_genotype_list = pd.read_csv(os.path.join(cwd,"init/BBHs_combs.tsv"), sep="\t")
@@ -941,3 +1000,4 @@ def register_callbacks(dashapp):
                 row_deletable=True,)
         except:
             return(html.P("Something did not work returning the table"))
+        
