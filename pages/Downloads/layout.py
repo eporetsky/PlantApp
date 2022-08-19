@@ -49,6 +49,7 @@ layout = html.Div([
         ),
         dbc.DropdownMenu(
             [dbc.DropdownMenuItem("Simple Tree", id="simple_tree", external_link=True, href="/apps/simple_tree"),
+            dbc.DropdownMenuItem("Protein Alignment", id="protein_alignment", external_link=True, href="/apps/protein_alignment"),
             dbc.DropdownMenuItem("Genome Graph", id="genome_graph", external_link=True, href="/apps/genome_graph"),
             dbc.DropdownMenuItem("GO Enrichment", id="go_enrichment", external_link=True, href="/apps/go_enrichment"),
             dbc.DropdownMenuItem("Mapping Summary", id="mapping_summary", external_link=True, href="/apps/mapping_summary"),

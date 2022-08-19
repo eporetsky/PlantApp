@@ -11,6 +11,7 @@ def register_callbacks(dashapp):
     import plotly.graph_objs as go
     from scipy.stats import  hypergeom
     from statsmodels.stats.multitest import multipletests
+    import dash_bio as dashbio
 
     import os
     import zlib
@@ -58,6 +59,8 @@ def register_callbacks(dashapp):
     def display_page_content(pathname):
         #print(session.get('username', None))
         pathname = pathname.split("/")[-1]
+        if pathname == "protein_alignment":
+            return tab_protein_alignment
         if pathname == "simple_tree":
             return tab_simple_tree
         if pathname == "genome_graph":
@@ -93,6 +96,100 @@ def register_callbacks(dashapp):
 
 
     ###############################################################################
+    #                                Alignments
+    ###############################################################################
+
+    tab_protein_alignment = html.Div([
+        dcc.Textarea(
+                id='protein_alignment_gene_list',
+                value='Paste gene list',
+                style={'width': '100%', 'height': 100},
+                ),
+        html.Button('Prepare alignment', id='protein_alignment_aln_button', type='submit'),
+        html.Button("Add example genes (then press prepare alignment button)", id="btn_protein_alignment_example", className="mr-1"),
+        html.Button("Download alignment", id="btn_download_protein_alignment_aln", className="mr-1"),
+        html.P("There seems to be a bug which requires refreshing the page in order to change the height of the alignment."),
+        dcc.Download(id="download_protein_alignment_aln"),
+        html.Div(id='protein_alignment_figure'),
+    ])
+
+    @dashapp.callback(
+        Output('protein_alignment_gene_list', 'value'),
+        Input('btn_protein_alignment_example', 'n_clicks'),
+        prevent_initial_call=True,)
+    def annotation_example(value):
+        return("Zm00001d021929\nZm00001d006678\nZm00001d008370\nZm00001d051416\nZm00001d017540\nZm00001d021410")
+
+
+    @dashapp.callback(
+        Output("protein_alignment_figure", "children"),
+        Input('protein_alignment_aln_button', 'n_clicks'),
+        State('protein_alignment_gene_list', 'value'),
+        prevent_initial_call=True)
+    def protein_alignment_update(clicks, value):
+        import random
+        import string
+        import urllib.request as urlreq
+
+        session_id = ''.join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
+        session["session_id"] = session_id
+
+        # Not sure why this callback is triggered when loading the app. This is a way out.
+        if callback_context.triggered[0]["prop_id"] == ".":
+            return(html.P("Insert list of genes to generate the fasta file."))
+
+        gene_list = value.split("\n")
+        if len(gene_list) > 500:
+            gene_list = gene_list[:500]
+        if gene_list[-1]=="":
+            gene_list = gene_list[:-1]
+        try:
+            con = sqlite3.connect(sqnce_path)
+            simple_tree_write_fasta(con, gene_list, session_id)
+            #print("ran protein")
+            con.close()
+            # uses a separate function to generate the download link
+        except:
+            return(html.P("Something did not work writing the fasta file"))
+
+        ctx = dash.callback_context
+        if (not ctx.triggered and not ctx.triggered[0]['value'] == 0):
+            return (no_update)
+        if clicks is not None:
+            try:
+                app_path = os.path.join(cwd,"pages", "Apps")
+                print("running famsa") # Needs: chmod a+x famsa
+                subprocess.run([app_path+"/./famsa "+app_path+f"/download/{session_id}_selected.fasta "+app_path+f"/download/{session_id}_selected.aln", "arguments"], shell=True)
+                app_path = os.path.join(cwd,"pages", "Apps")
+                
+                with open(app_path+f"/download/{session_id}_selected.aln", 'rb') as aln:
+                    alignment_data = aln.read().decode('utf-8')
+
+                return(dashbio.AlignmentChart(
+                    data=alignment_data,
+                    showconsensus=False,
+                    showgap=False,
+                    showconservation=False,
+                    #height=(len(gene_list)*30+20),
+                ))
+            except:
+                return(html.P("Something didn't work while generating the alignment."))
+
+    @dashapp.callback(
+        Output("download_protein_alignment_aln", "data"),
+        Input("btn_download_protein_alignment_aln", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def func_download_protein_alignment_aln(n_clicks):
+        try:
+            session_id = session["session_id"]
+            app_path = os.path.join(cwd,"pages", "Apps")
+            return(dcc.send_file(app_path+f"/download/{session_id}_selected.aln", "protein_alignment.aln"))
+        except:
+            None
+
+
+    ###############################################################################
     #                                Simple Tree
     ###############################################################################
 
@@ -105,9 +202,55 @@ def register_callbacks(dashapp):
                 ),
         html.Button('Prepare tree', id='simple_tree_aln_button', type='submit'),
         html.Button("Add example genes (then press prepare tree button)", id="btn_tree_example", className="mr-1"),
+        html.Button("Download fasta", id="btn_download_simpletree_fasta", className="mr-1"),
+        html.Button("Download alignment", id="btn_download_simpletree_aln", className="mr-1"),
+        html.Button("Download tree",  id="btn_download_simpletree_tree", className="mr-1"),
+        dcc.Download(id="download_simpletree_fasta"),
+        dcc.Download(id="download_simpletree_aln"),
+        dcc.Download(id="download_simpletree_tree"),
+
         html.Div(id='simple_tree_tree_figure'),
         #html.Div([html.Img(id = 'simple_tree_tree_figure', src = '')], id='plot_div'),
         ])
+
+    @dashapp.callback(
+        Output("download_simpletree_fasta", "data"),
+        Input("btn_download_simpletree_fasta", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def func_download_simpletree_fasta(n_clicks):
+        try:
+            session_id = session["session_id"]
+            app_path = os.path.join(cwd,"pages", "Apps")
+            return(dcc.send_file(app_path+f"/download/{session_id}_selected.fasta", "simple_tree.fasta"))
+        except:
+            None
+
+    @dashapp.callback(
+        Output("download_simpletree_aln", "data"),
+        Input("btn_download_simpletree_aln", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def func_download_simpletree_aln(n_clicks):
+        try:
+            session_id = session["session_id"]
+            app_path = os.path.join(cwd,"pages", "Apps")
+            return(dcc.send_file(app_path+f"/download/{session_id}_selected.aln", "simple_tree.aln"))
+        except:
+            None
+
+    @dashapp.callback(
+        Output("download_simpletree_tree", "data"),
+        Input("btn_download_simpletree_tree", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def func_download_simpletree_tree(n_clicks):
+        try:
+            session_id = session["session_id"]
+            app_path = os.path.join(cwd,"pages", "Apps")
+            return(dcc.send_file(app_path+f"/download/{session_id}_selected.tree", "simple_tree.tree"))
+        except:
+            None
 
     @dashapp.callback(
         Output('simple_tree_gene_list', 'value'),
@@ -142,14 +285,15 @@ def register_callbacks(dashapp):
         import random
         import string
         session_id = ''.join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
+        session["session_id"] = session_id
 
         # Not sure why this callback is triggered when loading the app. This is a way out.
         if callback_context.triggered[0]["prop_id"] == ".":
             return(html.P("Insert list of genes to generate the fasta file."))
 
         gene_list = value.split("\n")
-        if len(gene_list) > 50:
-            gene_list = gene_list[:50]
+        if len(gene_list) > 500:
+            gene_list = gene_list[:500]
         if gene_list[-1]=="":
             gene_list = gene_list[:-1]
         try:
