@@ -1645,7 +1645,7 @@ def register_callbacks(dashapp):
                 html.Div(children=[dcc.Input(id='heatmaps_row_ln', type="number", size=20, value=6, min=1, max=12, debounce=False,
                     style={'marginLeft':'-20px', 'width':'40px'})], className='six columns', style=dict(width='2%')),
                 html.Div(children=[html.P("Copy example to clipboard:")],
-                    className='six columns', style=dict(width='7%')),
+                    className='six columns', style=dict(width='12%')),
                 html.Div(children=[dcc.Clipboard(content="2\n3\n1\n-1\n-2\n2\n3\n2\n1\n-2\n-2\n3\n2\n3\n1\n0\n0\n1\n-1\n-2\n1")], 
                     className='six columns', style=dict(width='5%')),
             ], style=dict(display='flex', justifyContent='flex-start')),

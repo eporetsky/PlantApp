@@ -20,6 +20,7 @@ def register_callbacks(dashapp):
     import os
     import zlib
     import duckdb
+    #import mysql.connector
 
     # Set the cwd and SQNce.db path to be platform independent  
     if "plantapp" not in os.getcwd().lower():
@@ -28,7 +29,13 @@ def register_callbacks(dashapp):
         cwd = os.getcwd() # for personal computer
     sqnce_path = os.path.join(cwd, "SQNce.db")
     
-    
+    #con = mysql.connector.connect(
+    #                host='username.mysql.pythonanywhere-services.com', 
+    #                db='username$DatabaseName', 
+    #                user='username', 
+    #                password='password'
+    #                ) 
+
 
     @dashapp.callback(Output('tab_content', 'children'),
                       Input('url', 'pathname'))
@@ -601,46 +608,88 @@ def register_callbacks(dashapp):
     #                                Orthogroups
     ###############################################################################
     tab_orthogroups_content = html.Div([
-        dcc.Textarea(
-            id='orthogroups_gene_list',
-            value='Textarea content initialized\nwith multiple lines of text',
-            style={'width': '100%', 'height': 100},
-            ),
-        dbc.Row(dbc.Col(
-            [
-            dbc.Button("Download fasta with gene IDs", color="primary", id="btn_orthogroups_download_fasta_geneIDs", className="mr-1"),
-            dcc.Download(id="download_orthogroups_fasta_geneIDs"),
-            dbc.Button("Download fasta with symbols", color="primary", className="mr-1"),
-        ])),
-        dcc.Clipboard(id="orthogroups_table_copy", style={"fontSize":20}),
+        html.Div(
+            className="row", children=[
+                html.Div(children=[html.P("Add a gene ID below to get associated orthogroup:", style={'marginTop': 10, 'marginBottom': 10})], 
+                    className='six columns', style=dict(width='25%')), 
+            ], style=dict(display='flex')),
+        
+        html.Div(
+            className="row", children=[
+                html.Div(children=[dcc.Textarea(id='orthogroups_gene_list',
+                    value='Add a single gene ID here\n(If multiple gene IDs are added only the first will count)',
+                    style={'width': '80%', 'height': 60, 'marginBottom': 10, 'marginTop': 0},
+                    )], className='six columns', style=dict(width='40%')),
+            ], style=dict(display='flex')),
+
+        html.Div(
+            className="row", children=[
+                html.Div(children=[dbc.Button("Find orthogroup", 
+                                    color="primary", id="btn_submit_orthogroup", className="mr-1",
+                                    style={'marginTop': 0, 'marginBottom': 20})], 
+                    className='six columns', style=dict(width='25%')), 
+            ], style=dict(display='flex')),
+                
+        html.Div(id="orthogroup_species_dropdown"),
+        #html.Div(id="orthogroup_species_copy_genes"),
         html.Div(id="orthogroups_seq_table"),
-        ])
+        ], style=dict(marginLeft=20, marginRight=20))
 
     @dashapp.callback(
+        Output('orthogroup_species_dropdown', 'children'),
         Output('orthogroups_seq_table', 'children'),
-        Input('orthogroups_gene_list', 'value'))
-    def get_protein_list(gene_id):
+        Input('btn_submit_orthogroup', 'n_clicks'),
+        State('orthogroups_gene_list', 'value'),
+        prevent_initial_call=True,)
+    def get_protein_list(_, gene_id):
         con = sqlite3.connect(sqnce_path) # deploy with this
         cursorObj = con.cursor()
-        print(gene_id)
         try:
             if "\n" in gene_id:
-                gene_id = gene_id.split("\n")[-1]
-            print("bla")
+                gene_id = gene_id.split("\n")[0]
+            print("test", gene_id)
             df = pd.read_sql_query("""SELECT orthogroup, genome_id, gene_id
                     FROM orthogroups
                     WHERE orthogroup in (
                             SELECT orthogroup
                             FROM orthogroups
                             WHERE gene_id = '{0}' )""".format(gene_id), con)
-            print("bla2")
             selected = cursorObj.fetchall()
-            print(selected)
-            print("test")
+            #if selected == []:
+            #    return([html.P("Did not find an orthogroup for the gene."), html.P("")])
         except:
-            return(html.P("Something did not work reading the gene list"))
+            return([html.P("Something did not work reading the gene list"), html.P("")])
+       
         try:
-            return dash_table.DataTable(
+            dropdown_dict = df.groupby("genome_id").count()["orthogroup"].to_dict()
+            dropdown_ls = []
+            dropdown_ls.append({'label': 'All', 'value': 'all'})
+            for key in dropdown_dict:
+                dropdown_ls.append({'label': key + " ("+ str(dropdown_dict[key]) + ")", 'value': key})
+
+            orthogroup_dropdown_div = html.Div(
+                # https://css-tricks.com/wp-content/uploads/2022/02/css-flexbox-poster.png
+                className="row", children=[
+                    html.Div(children=[dcc.Dropdown(
+                        id='orthogroup_select_species_dropdown',
+                        options=dropdown_ls,
+                        value="all",
+                        multi=True,
+                        searchable=True
+                    ),], className='six columns', style=dict(width='60%')), 
+                    html.Div(children=[html.P("Copy selected gene IDs:")],
+                        className='six columns', style=dict(width='12%')),
+                    html.Div(children=[dcc.Clipboard(id="orthogroups_selected_copy", style={"fontSize":20})], 
+                        className='six columns', style=dict(width='5%')),
+                    html.Div(children=[dbc.Button("Download Orthogroup Table", 
+                            color="primary", id="btn_download_orthogroup", className="mr-1"),
+                            dcc.Download(id="download_orthogroup"),],
+                            className='six columns', style=dict(width='15%')), 
+                ], style=dict(display='flex', justifyContent='flex-start', marginbottom="20px")),
+
+            #orthogroups_table_copy = dcc.Clipboard(id="orthogroups_table_copy", style={"fontSize":20}),
+
+            orthogroup_table = dash_table.DataTable(
                 id="orthogroups_table_state",
                 columns=[{"name": i, "id": i} for i in df.columns],
                 data=df.to_dict('records'),
@@ -649,9 +698,39 @@ def register_callbacks(dashapp):
                             'maxWidth': 0,},
                 editable=True,
                 row_deletable=True,)
-        except:
-            return(html.P("Something did not work returning the table"))
 
+            return(orthogroup_dropdown_div, orthogroup_table)
+            #return([orthogroup_dropdown, orthogroups_table_copy, ])
+        except:
+            return([html.P("Something did not work reading the gene list"), html.P("")])
+
+    @dashapp.callback(
+        Output("orthogroups_selected_copy", "content"),
+        Input("orthogroups_selected_copy", "n_clicks"),
+        State("orthogroup_select_species_dropdown", "value"),
+        State("orthogroups_table_state", "data"),
+        prevent_initial_call=True,
+    )
+    def orthogroup_genes_copy(_, species, df):
+        df = pd.DataFrame.from_dict(df)
+        if type(species) == str:
+            species = [species]
+        if "all" in species:
+            gene_list = df["gene_id"].to_list()
+        else:
+            gene_list = df[df["genome_id"].isin(species)]["gene_id"].to_list()
+        return ("\n".join(gene_list))
+
+    @dashapp.callback(
+        Output("download_orthogroup", "data"),
+        Input("btn_download_orthogroup", "n_clicks"),
+        State("orthogroups_table_state", "data"),
+        prevent_initial_call=True,
+    )
+    def orthogroup_table_download(_, df):
+        df = pd.DataFrame.from_dict(df)
+        output = df.to_csv(index=False, header=True, sep="\t", quoting=csv.QUOTE_NONE)
+        return dict(content=output, filename="orthogroup.tsv")
 
 
     ###############################################################################
@@ -777,7 +856,10 @@ def register_callbacks(dashapp):
                                 FROM protein_seqs
                                 WHERE protein_id =  ?  ''', (entity,))
             # (name,) - need the comma to treat it as a single item and not list of letters
-            selected = cursorObj.fetchall()[0]
+            selected = cursorObj.fetchall()
+            if selected == []:
+                continue # Skip if cannot find gene
+            selected = selected[0] # Otherwise, get the value of the first returned row
             od[selected[0]] = zlib.decompress(selected[1]).decode('utf-8')[:-1] 
         return(od)
 
