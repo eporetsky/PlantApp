@@ -664,6 +664,7 @@ def register_callbacks(dashapp):
             dropdown_dict = df.groupby("genome_id").count()["orthogroup"].to_dict()
             dropdown_ls = []
             dropdown_ls.append({'label': 'All', 'value': 'all'})
+            dropdown_ls.append({'label': 'ZmNAM', 'value': 'ZmNAM'})
             for key in dropdown_dict:
                 dropdown_ls.append({'label': key + " ("+ str(dropdown_dict[key]) + ")", 'value': key})
 
@@ -713,12 +714,19 @@ def register_callbacks(dashapp):
     )
     def orthogroup_genes_copy(_, species, df):
         df = pd.DataFrame.from_dict(df)
+        gene_groups_ZmNAM = ["ZmB73v4","ZmB97","ZmCML52","ZmCML69","ZmCML103","ZmCML228","ZmCML247","ZmCML277","ZmCML322","ZmCML333","ZmHP301","ZmIl14H","ZmKi3","ZmKi11","ZmKy21","ZmM37W","ZmM162W","ZmMo18W","ZmMs71","ZmNC350","ZmNC358","ZmOh7B","ZmOh43","ZmP39","ZmTx303","ZmTzi8"]
+        # If only one item is selected it returns a string instead of a list
         if type(species) == str:
             species = [species]
+        
         if "all" in species:
             gene_list = df["gene_id"].to_list()
         else:
             gene_list = df[df["genome_id"].isin(species)]["gene_id"].to_list()
+
+        if "ZmNAM" in species:
+            group_gene_list = df[df["genome_id"].isin(gene_groups_ZmNAM)]["gene_id"].to_list()
+            gene_list = list(set(gene_list+group_gene_list))
         return ("\n".join(gene_list))
 
     @dashapp.callback(

@@ -108,6 +108,7 @@ def register_callbacks(dashapp):
         html.Button('Prepare alignment', id='protein_alignment_aln_button', type='submit'),
         html.Button("Add example genes (then press prepare alignment button)", id="btn_protein_alignment_example", className="mr-1"),
         html.Button("Download alignment", id="btn_download_protein_alignment_aln", className="mr-1"),
+        dcc.Checklist(["Add genotype prefix"], ["Add genotype prefix"], inline=True, id='btn_alignment_prefix'),
         html.P("There seems to be a bug which requires refreshing the page in order to change the height of the alignment."),
         dcc.Download(id="download_protein_alignment_aln"),
         html.Div(id='protein_alignment_figure'),
@@ -125,8 +126,9 @@ def register_callbacks(dashapp):
         Output("protein_alignment_figure", "children"),
         Input('protein_alignment_aln_button', 'n_clicks'),
         State('protein_alignment_gene_list', 'value'),
+        State('btn_alignment_prefix', 'value'),
         prevent_initial_call=True)
-    def protein_alignment_update(clicks, value):
+    def protein_alignment_update(clicks, value, add_prefix):
         import random
         import string
         import urllib.request as urlreq
@@ -137,7 +139,7 @@ def register_callbacks(dashapp):
         # Not sure why this callback is triggered when loading the app. This is a way out.
         if callback_context.triggered[0]["prop_id"] == ".":
             return(html.P("Insert list of genes to generate the fasta file."))
-
+        add_prefix = True if "Add genotype prefix" in add_prefix else False
         gene_list = value.split("\n")
         if len(gene_list) > 500:
             gene_list = gene_list[:500]
@@ -145,7 +147,7 @@ def register_callbacks(dashapp):
             gene_list = gene_list[:-1]
         try:
             con = sqlite3.connect(sqnce_path)
-            simple_tree_write_fasta(con, gene_list, session_id)
+            simple_tree_write_fasta(con, gene_list, session_id, add_prefix)
             #print("ran protein")
             con.close()
             # uses a separate function to generate the download link
@@ -205,6 +207,7 @@ def register_callbacks(dashapp):
         html.Button("Download fasta", id="btn_download_simpletree_fasta", className="mr-1"),
         html.Button("Download alignment", id="btn_download_simpletree_aln", className="mr-1"),
         html.Button("Download tree",  id="btn_download_simpletree_tree", className="mr-1"),
+        dcc.Checklist(["Add genotype prefix"], ["Add genotype prefix"], inline=True, id='btn_simple_tree_prefix'),
         dcc.Download(id="download_simpletree_fasta"),
         dcc.Download(id="download_simpletree_aln"),
         dcc.Download(id="download_simpletree_tree"),
@@ -260,11 +263,11 @@ def register_callbacks(dashapp):
         return("Zm00001d021929\nZm00001d006678\nZm00001d008370\nZm00001d051416\nZm00001d017540\nZm00001d021410")
 
 
-    def simple_tree_write_fasta(con, entity_list, session_id):
+    def simple_tree_write_fasta(con, entity_list, session_id, add_prefix):
         od = OrderedDict()
         for entity in entity_list:
             cursorObj = con.cursor()
-            cursorObj.execute('''SELECT protein_id, protein_sequence
+            cursorObj.execute('''SELECT protein_id, protein_sequence, genome_id
                                 FROM protein_seqs
                                 WHERE protein_id =  ?  ''', (entity,))
             # (name,) - need the comma to treat it as a single item and not list of letters
@@ -272,7 +275,8 @@ def register_callbacks(dashapp):
             if selected == []:
                 continue # Skip if cannot find gene
             selected = selected[0] # Otherwise, get the value of the first returned row
-            record = SeqRecord(Seq(zlib.decompress(selected[1]).decode(encoding='UTF-8')[:-1]), id=selected[0], name="", description="")
+            gene_id = selected[2]+"_"+selected[0] if add_prefix else selected[0]
+            record = SeqRecord(Seq(zlib.decompress(selected[1]).decode(encoding='UTF-8')[:-1]), id=gene_id, name="", description="")
             od[selected[0]] = record
         with open(os.path.join(cwd,"pages", "Apps", "download", f"{session_id}_selected.fasta"), 'w') as handle:
             SeqIO.write(od.values(), handle, 'fasta')
@@ -280,8 +284,10 @@ def register_callbacks(dashapp):
     @dashapp.callback(
         Output("simple_tree_tree_figure", "children"),
         Input('simple_tree_aln_button', 'n_clicks'),
-        State('simple_tree_gene_list', 'value'))
-    def alignment_update(clicks, value):
+        State('simple_tree_gene_list', 'value'),
+        State('btn_simple_tree_prefix', 'value'),
+        prevent_initial_call=True)
+    def alignment_update(clicks, value, add_prefix):
         import random
         import string
         session_id = ''.join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
@@ -290,7 +296,7 @@ def register_callbacks(dashapp):
         # Not sure why this callback is triggered when loading the app. This is a way out.
         if callback_context.triggered[0]["prop_id"] == ".":
             return(html.P("Insert list of genes to generate the fasta file."))
-
+        add_prefix = True if "Add genotype prefix" in add_prefix else False
         gene_list = value.split("\n")
         if len(gene_list) > 500:
             gene_list = gene_list[:500]
@@ -298,7 +304,7 @@ def register_callbacks(dashapp):
             gene_list = gene_list[:-1]
         try:
             con = sqlite3.connect(sqnce_path)
-            simple_tree_write_fasta(con, gene_list, session_id)
+            simple_tree_write_fasta(con, gene_list, session_id, add_prefix)
             #print("ran protein")
             con.close()
             # uses a separate function to generate the download link
