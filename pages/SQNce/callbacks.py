@@ -60,8 +60,10 @@ def register_callbacks(dashapp):
             return tab_protein_content
         elif pathname == "promoters":
             return tab_promoter_content
-        elif pathname == "coordinates":
-            return tab_coordinates_content
+        elif pathname == "gene_coordinates":
+            return tab_gene_coordiantes_content
+        elif pathname == "genes_near_coordinates":
+            return tab_genes_near_coordinates_content
         elif pathname == "transcriptomics":
             return tab_transcriptomics_content
         elif pathname == "omics":
@@ -90,10 +92,110 @@ def register_callbacks(dashapp):
             return None
 
     ###############################################################################
-    #                                Coordinates
+    #                               Gene Coordinates
     ###############################################################################
 
-    tab_coordinates_content = html.Div([
+    tab_gene_coordiantes_content = html.Div([
+        html.Div(
+            className="row", children=[
+                html.Div(children=[html.P("Add gene IDs below to get their genomic coordiantes:", style={'marginTop': 10, 'marginBottom': 10})], 
+                    className='six columns', style=dict(width='25%')), 
+            ], style=dict(display='flex')),
+        
+        html.Div(
+            className="row", children=[
+                html.Div(children=[dcc.Textarea(id='gene_coordinates_gene_list',
+                    value='Add multiple gene IDs below, 1 gene ID per row\n(maximum gene IDs per query is 60,000)',
+                    style={'width': '80%', 'height': 60, 'marginBottom': 10, 'marginTop': 0},
+                    )], className='six columns', style=dict(width='40%')),
+            ], style=dict(display='flex')),
+
+        html.Div(
+            className="row", children=[
+                html.Div(children=[dbc.Button("Find gene coordiantes", 
+                                    color="primary", id="btn_submit_gene_coordinates_gene_list", className="mr-1",
+                                    style={'marginTop': 0, 'marginBottom': 20})], 
+                    className='six columns', style=dict(width='25%')), 
+            ], style=dict(display='flex')),
+
+        html.Div(
+            className="row", children=[
+                    html.Div(children=[html.P("Copy table to clipboard:")],
+                        className='six columns', style=dict(width='12%')),
+                    html.Div(children=[dcc.Clipboard(id="gene_coordinates_copy", style={"fontSize":20})], 
+                        className='six columns', style=dict(width='5%')),
+            ], style=dict(display='flex')),
+
+                
+        html.Div(id="gene_coordinates_table"),
+        ], style=dict(marginLeft=20, marginRight=20))
+
+    @dashapp.callback(
+        Output("gene_coordinates_copy", "content"),
+        Input("gene_coordinates_copy", "n_clicks"),
+        State("state_gene_coordinates_table", "data"),
+        prevent_initial_call=True,
+    )
+    def orthogroup_genes_copy(_, df):
+        df = pd.DataFrame(df)
+        # See options for .to_csv() or .to_excel() or .to_string() in the  pandas documentation
+        return df.to_csv(index=False)  # includes headers
+
+    @dashapp.callback(
+        Output('gene_coordinates_table', 'children'),
+        Input('btn_submit_gene_coordinates_gene_list', 'n_clicks'),
+        State('gene_coordinates_gene_list', 'value'),
+        prevent_initial_call=True,)
+    def get_gene_coordinates(_, gene_list):
+        print("Getting gene coordiantes")
+        con = sqlite3.connect(sqnce_path) # deploy with this
+        try:
+            gene_list = gene_list.split("\n")
+            if len(gene_list) > 70000:
+                gene_list = gene_list[:70000]
+            if gene_list[-1]=="":
+                gene_list = gene_list[:-1]
+
+            
+            gene_coordinates_list = []
+            for gene_id in gene_list:
+                cursorObj = con.cursor()
+                cursorObj.execute('''SELECT gene_id, genome_id, gene_chr, gene_start, gene_end, gene_orientation
+                                    FROM gene_coordinates
+                                    WHERE gene_id =  ?  ''', (gene_id,))
+                # (name,) - need the comma to treat it as a single item and not list of letters
+                selected = cursorObj.fetchall()
+                if selected == []:
+                    continue # Skip if cannot find gene
+                    #od[selected[0]] =  ...
+                selected = selected[0] # Otherwise, get the value of the first returned row
+                gene_coordinates_list.append(selected)
+        except:
+            return(html.P("Something did not work reading the gene list"))
+
+        try:
+            df = pd.DataFrame(gene_coordinates_list, columns=["gene_id", "genome_id", "gene_chr", "gene_start", "gene_end", "gene_orientation"])
+            gene_coordiantes_table = dash_table.DataTable(
+                id="state_gene_coordinates_table",
+                columns=[{"name": i, "id": i} for i in df.columns],
+                data=df.to_dict('records'),
+                style_cell={'textAlign': 'left',
+                            'overflow': 'hidden',
+                            'maxWidth': 0,},
+                sort_action='native',
+                sort_mode='multi',
+                editable=True,
+                row_deletable=True,)
+
+            return(gene_coordiantes_table)
+        except:
+            return(html.P("Something did not work reading the gene list"))
+
+    ###############################################################################
+    #                      Genes Near Coordinates
+    ###############################################################################
+
+    tab_genes_near_coordinates_content = html.Div([
 
         # Get a list of unique genotypes from the db
         dcc.Dropdown(
