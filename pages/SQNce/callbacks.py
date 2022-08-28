@@ -114,8 +114,11 @@ def register_callbacks(dashapp):
             className="row", children=[
                 html.Div(children=[dbc.Button("Find gene coordiantes", 
                                     color="primary", id="btn_submit_gene_coordinates_gene_list", className="mr-1",
-                                    style={'marginTop': 0, 'marginBottom': 20})], 
-                    className='six columns', style=dict(width='25%')), 
+                                    style={'marginTop': 0, 'marginBottom': 20, 'marginRight': 5}),
+                                dbc.Button("Show example gene coordiantes", 
+                                    color="primary", id="btn_example_gene_coordinates_gene_list", className="mr-1",
+                                    style={'marginTop': 0, 'marginBottom': 20})],
+                    className='six columns', style=dict(width='45%')), 
             ], style=dict(display='flex')),
 
         html.Div(
@@ -129,6 +132,14 @@ def register_callbacks(dashapp):
                 
         html.Div(id="gene_coordinates_table"),
         ], style=dict(marginLeft=20, marginRight=20))
+
+    @dashapp.callback(
+        Output('gene_coordinates_gene_list', 'value'),
+        Input('btn_example_gene_coordinates_gene_list', 'n_clicks'),
+        prevent_initial_call=True,)
+    def symbols_example(value):
+        return("Zm00001d021929\nZm00001d006678\nZm00001d008370\nZm00001d051416\nZm00001d017540\nZm00001d021410")
+
 
     @dashapp.callback(
         Output("gene_coordinates_copy", "content"),
@@ -454,16 +465,33 @@ def register_callbacks(dashapp):
     ###############################################################################
 
     tab_annotation_content = html.Div([
-        dcc.Textarea(
-            id='annotation_gene_list',
-            value='Textarea content initialized\nwith multiple lines of text',
-            style={'width': '100%', 'height': 100},
-            ),
+        html.Div(
+            className="row", children=[
+                html.Div(children=[html.P("Add gene IDs below to get their annotations:", style={'marginTop': 10, 'marginBottom': 10})], 
+                    className='six columns', style=dict(width='25%')), 
+            ], style=dict(display='flex')),
 
-        dbc.Button("Show example annotaion", color="primary", id="btn_annotation_example", className="mr-1"),
+        html.Div(
+            className="row", children=[
+                html.Div(children=[dcc.Textarea(id='annotation_gene_list',
+                    value='Add multiple gene IDs below, 1 gene ID per row\n(maximum gene IDs per query is 60,000)',
+                    style={'width': '80%', 'height': 60, 'marginBottom': 10, 'marginTop': 0},
+                    )], className='six columns', style=dict(width='40%')),
+            ], style=dict(display='flex')),
+
+        html.Div(
+            className="row", children=[
+                html.Div(children=[dbc.Button("Find gene annotations", 
+                                    color="primary", id="btn_submit_gene_annotations", className="mr-1",
+                                    style={'marginTop': 0, 'marginBottom': 20, 'marginRight': 5}),
+                                dbc.Button("Show example gene annotations", 
+                                    color="success", id="btn_annotation_example", className="mr-1",
+                                    style={'marginTop': 0, 'marginBottom': 20})],
+                    className='six columns', style=dict(width='45%')), 
+            ], style=dict(display='flex')),
 
         html.Div(id="annotation_table"),
-        ])
+        ], style=dict(marginLeft=20, marginRight=20))
 
     def annotation_select(con, entity_list):
         ls = []
@@ -490,13 +518,15 @@ def register_callbacks(dashapp):
     
     @dashapp.callback(
         Output('annotation_table', 'children'),
-        Input('annotation_gene_list', 'value'))
-    def get_gene_list(value):
+        Input("btn_submit_gene_annotations", "n_clicks"),
+        State('annotation_gene_list', 'value'),
+        prevent_initial_call=True,)
+    def get_gene_list(_, value):
         con = sqlite3.connect(sqnce_path) # deploy with this
         try:
             gene_list = value.split("\n")
-            if len(gene_list) > 500:
-                gene_list = gene_list[:500]
+            if len(gene_list) > 60000:
+                gene_list = gene_list[:60000]
             if gene_list[-1]=="":
                 gene_list = gene_list[:-1]
         except:
@@ -521,16 +551,34 @@ def register_callbacks(dashapp):
     ###############################################################################
 
     tab_symbols_content = html.Div([
-        dcc.Textarea(
-            id='symbols_gene_list',
-            value='Textarea content initialized\nwith multiple lines of text',
-            style={'width': '100%', 'height': 100},
-            ),
+        html.Div(
+            className="row", children=[
+                html.Div(children=[html.P("Add gene IDs below to get their symbols:", style={'marginTop': 10, 'marginBottom': 10})], 
+                    className='six columns', style=dict(width='25%')), 
+            ], style=dict(display='flex')),
+        
+        html.Div(
+            className="row", children=[
+                html.Div(children=[dcc.Textarea(id='symbols_gene_list',
+                    value='Add multiple gene IDs below, 1 gene ID per row\n(maximum gene IDs per query is 60,000)',
+                    style={'width': '80%', 'height': 60, 'marginBottom': 10, 'marginTop': 0},
+                    )], className='six columns', style=dict(width='40%')),
+            ], style=dict(display='flex')),
 
-        dbc.Button("Show example symbols", color="primary", id="btn_symbols_example", className="mr-1"),
+        html.Div(
+            className="row", children=[
+                html.Div(children=[dbc.Button("Find gene symbols", 
+                                    color="primary", id="btn_submit_gene_symbols", className="mr-1",
+                                    style={'marginTop': 0, 'marginBottom': 20, 'marginRight': 5}),
+                                dbc.Button("Show example gene symbols", 
+                                    color="success", id="btn_symbols_example", className="mr-1",
+                                    style={'marginTop': 0, 'marginBottom': 20})],
+                    className='six columns', style=dict(width='45%')), 
+            ], style=dict(display='flex')),
 
+                
         html.Div(id="symbols_table"),
-        ])
+        ], style=dict(marginLeft=20, marginRight=20))
 
     def symbol_select(con, entity_list):
         ls = []
@@ -542,7 +590,7 @@ def register_callbacks(dashapp):
             # (name,) - need the comma to treat it as a single item and not list of letters
             selected = cursorObj.fetchall()
             if selected == []:
-                ls.append("")
+                ls.append("Gene not found")
             else:
                 ls.append(selected[0][1])    
         return(ls)
@@ -556,13 +604,16 @@ def register_callbacks(dashapp):
 
     @dashapp.callback(
         Output('symbols_table', 'children'),
-        Input('symbols_gene_list', 'value'))
-    def get_gene_list(value):
+        Input("btn_submit_gene_symbols", "n_clicks"),
+        State('symbols_gene_list', 'value'),
+        prevent_initial_call=True,
+    )
+    def get_gene_list(_, value):
         con = sqlite3.connect(sqnce_path) # deploy with this
         try:
             gene_list = value.split("\n")
-            if len(gene_list) > 500:
-                gene_list = gene_list[:500]
+            if len(gene_list) > 1000:
+                gene_list = gene_list[:1000]
             if gene_list[-1]=="":
                 gene_list = gene_list[:-1]
         except:
@@ -583,7 +634,7 @@ def register_callbacks(dashapp):
             return(html.P("Something did not work returning the table"))
 
     ###############################################################################
-    #                                Family Annotations
+    #                                Families Annotations
     ###############################################################################
 
     tab_family_familyIDs_content = html.Div([
@@ -604,15 +655,26 @@ def register_callbacks(dashapp):
         ),
         dbc.Button("Get selected gene families", id='family_get_selected_btn', 
                     outline=True, color="primary", className="me-1"),
-                
+        dbc.Button("Show example families", color="primary", id="btn_families_example", 
+            className="mr-1"),        
+        
         html.Div(id="family_familyIDs_table"),
         ])
     
+    @dashapp.callback(
+        Output('family_select_species_dropdown', 'value'),
+        Output('family_select_name_dropdown', 'value'),
+        Input('btn_families_example', 'n_clicks'),
+        prevent_initial_call=True,)
+    def symbols_example(value):
+        return([["B73v4"], ["Terpenoid synthases"]])
+
     @dashapp.callback(
         Output("family_familyIDs_table", "children"),
         Input("family_get_selected_btn", "n_clicks"),
         State("family_select_species_dropdown", "value"),
         State("family_select_name_dropdown", "value"),
+        prevent_initial_call=True,
     )
     def family_familyIDs_table(_, genotypes, families):
         con = sqlite3.connect(sqnce_path) # deploy with this
@@ -624,6 +686,7 @@ def register_callbacks(dashapp):
         df = pd.read_sql_query("""SELECT protein_id, genome_id, family_name 
                                 FROM gene_families
                                 WHERE genome_id IN ('{0}') AND family_name IN ('{1}')""".format(genotypes, families), con)
+        print(families)
         try:
             return dash_table.DataTable(
                 id="family_table_state",
@@ -640,14 +703,34 @@ def register_callbacks(dashapp):
     #####################################################################################
 
     tab_family_geneIDs_content = html.Div([
-        dcc.Textarea(
-            id='family_gene_list',
-            value='Insert gene or gene-family list here, one id per row.',
-            style={'width': '100%', 'height': 100},
-            ),
-        dbc.Button("Show example families", color="primary", id="btn_family_example", className="mr-1"),
+        html.Div(
+            className="row", children=[
+                html.Div(children=[html.P("Add gene IDs below to get their gene families:", style={'marginTop': 10, 'marginBottom': 10})], 
+                    className='six columns', style=dict(width='25%')), 
+            ], style=dict(display='flex')),
+        
+        html.Div(
+            className="row", children=[
+                html.Div(children=[dcc.Textarea(id='family_family_geneID_list',
+                    value='Add multiple gene IDs below, 1 gene ID per row\n(maximum gene IDs per query is 60,000)',
+                    style={'width': '80%', 'height': 60, 'marginBottom': 10, 'marginTop': 0},
+                    )], className='six columns', style=dict(width='40%')),
+            ], style=dict(display='flex')),
+
+        html.Div(
+            className="row", children=[
+                html.Div(children=[dbc.Button("Find gene families", 
+                                    color="primary", id="btn_submit_family_geneID", className="mr-1",
+                                    style={'marginTop': 0, 'marginBottom': 20, 'marginRight': 5}),
+                                dbc.Button("Show example gene families", 
+                                    color="success", id="btn_family_geneID_example", className="mr-1",
+                                    style={'marginTop': 0, 'marginBottom': 20})],
+                    className='six columns', style=dict(width='45%')), 
+            ], style=dict(display='flex')),
+
+                
         html.Div(id="family_geneIDs_table"),
-        ])
+        ], style=dict(marginLeft=20, marginRight=20))
     
     def family_gene_select(con, gene_list):
         # Use an input list of genes to find their family assignments
@@ -668,8 +751,8 @@ def register_callbacks(dashapp):
         return([genotype_ls, family_ls])
     
     @dashapp.callback(
-        Output('family_gene_list', 'value'),
-        Input('btn_family_example', 'n_clicks'),
+        Output('family_family_geneID_list', 'value'),
+        Input('btn_family_geneID_example', 'n_clicks'),
         prevent_initial_call=True,)
     def family_example(value):
         return("Zm00001d021929\nZm00001d006678\nZm00001d008370\nZm00001d051416\nZm00001d017540\nZm00001d021410")
@@ -677,14 +760,16 @@ def register_callbacks(dashapp):
 
     @dashapp.callback(
         Output("family_geneIDs_table", "children"),
-        Input('family_gene_list', 'value'),
+        State('family_family_geneID_list', 'value'),
+        Input('btn_submit_family_geneID', 'n_clicks'),
+        prevent_initial_call=True,
     )
     def family_geneIDs_table(value):
         con = sqlite3.connect(sqnce_path) # deploy with this
         try:
             gene_list = value.split("\n")
-            if len(gene_list) > 1000:
-                gene_list = gene_list[:1000]
+            if len(gene_list) > 60000:
+                gene_list = gene_list[:60000]
             if gene_list[-1]=="":
                 gene_list = gene_list[:-1]
         except:
@@ -728,14 +813,25 @@ def register_callbacks(dashapp):
             className="row", children=[
                 html.Div(children=[dbc.Button("Find orthogroup", 
                                     color="primary", id="btn_submit_orthogroup", className="mr-1",
+                                    style={'marginTop': 0, 'marginBottom': 20, 'marginRight': 5}), 
+                                dbc.Button("Show example orthogroup", 
+                                    color="primary", id="btn_example_orthogroup", className="mr-1",
                                     style={'marginTop': 0, 'marginBottom': 20})], 
-                    className='six columns', style=dict(width='25%')), 
+                    className='six columns', ),#style=dict(width='25%')), 
             ], style=dict(display='flex')),
                 
         html.Div(id="orthogroup_species_dropdown"),
         #html.Div(id="orthogroup_species_copy_genes"),
         html.Div(id="orthogroups_seq_table"),
         ], style=dict(marginLeft=20, marginRight=20))
+
+    @dashapp.callback(
+        Output('orthogroups_gene_list', 'value'),
+        Input('btn_example_orthogroup', 'n_clicks'),
+        prevent_initial_call=True,)
+    def symbols_example(value):
+        return("Zm00001d021929")
+
 
     @dashapp.callback(
         Output('orthogroup_species_dropdown', 'children'),
